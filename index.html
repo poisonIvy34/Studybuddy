@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudyBuddy BYU</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="mode-student">
+  <div id="banners" aria-live="polite"></div>
+  <div id="app"></div>
+  <div id="demo"></div>
+
+  <!-- Load order is fixed (CLAUDE.md): data → clock → store → rules → notify → ui → router → views/* → demo → main -->
+  <script src="js/data.js"></script>
+  <script src="js/clock.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/router.js"></script>
+  <!-- Views go here once they exist (a missing file is a console error on file://):
+  <script src="js/views/signin.js"></script>
+  <script src="js/views/onboarding.js"></script>
+  <script src="js/views/exams.js"></script>
+  <script src="js/views/after.js"></script>
+  <script src="js/views/me.js"></script>
+  <script src="js/views/admin.js"></script>
+  -->
+  <script src="js/demo.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
