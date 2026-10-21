@@ -1,0 +1,60 @@
+/* css/views/admin.css — styles used only by js/views/admin.js. Every rule is prefixed with .v-admin. */
+
+.v-admin { min-width: 0; }
+.v-admin h2 { margin-top: 20px; }
+.v-admin-section { margin-bottom: 8px; }
+.v-admin .v-admin-back { display: inline-block; margin-bottom: 8px; padding-left: 0; }
+.v-admin .v-admin-gap { margin-left: 6px; }
+
+/* Inbox */
+.v-admin .inbox-item.v-admin-read { background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.v-admin .v-admin-inbox-text { margin-top: 4px; }
+
+/* Courses, exams, slots */
+.v-admin .v-admin-course { padding-bottom: 6px; }
+.v-admin .v-admin-course .card-sub code { font-size: 13px; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+.v-admin .v-admin-exam { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.v-admin .v-admin-exam .table-wrap { margin-top: 10px; margin-bottom: 8px; }
+.v-admin .v-admin-exam .empty { margin-top: 8px; }
+.v-admin .v-admin-form { background: var(--soft); box-shadow: none; margin-top: 12px; }
+.v-admin .v-admin-actions { flex-wrap: nowrap; align-items: center; white-space: nowrap; }
+.v-admin .v-admin-input .field { margin-bottom: 0; }
+.v-admin .v-admin-msg:empty { display: none; }
+.v-admin .v-admin-msg .notice { margin: 8px 0; }
+
+/* Tables: scroll inside their own box, never the page */
+.v-admin .table-wrap { max-width: 100%; -webkit-overflow-scrolling: touch; }
+.v-admin .table td { white-space: normal; }
+.v-admin .v-admin-email { overflow-wrap: anywhere; }
+.v-admin .v-admin-check + .v-admin-check { margin-top: 4px; }
+.v-admin .v-admin-table-head { margin-top: 12px; }
+.v-admin .v-admin-table-head h3 { margin-bottom: 6px; }
+
+/* Metrics */
+.v-admin .v-admin-kpi-tag { margin: 6px 0 4px; }
+.v-admin .v-admin-pending { background: var(--soft); }
+.v-admin .kpi-value.v-admin-pending-value { font-size: 16px; color: var(--muted); padding: 6px 0 4px; }
+.v-admin .v-admin-def { font-style: italic; }
+.v-admin .kpi .tag { margin-left: 2px; }
+
+@media (max-width: 520px) {
+  .v-admin .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .v-admin .kpi { padding: 10px 12px; min-width: 0; }
+  .v-admin .kpi-value { font-size: 22px; }
+  .v-admin .table th, .v-admin .table td { padding: 8px; }
+}
+
+/* Slot list (stacked rows, readable at phone width) */
+.v-admin .v-admin-slots { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; margin-bottom: 8px; }
+.v-admin .v-admin-slot { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.v-admin .v-admin-slot > * + * { margin-top: 4px; }
+.v-admin .v-admin-slot .btn-group { margin-top: 8px; }
+.v-admin .v-admin-slot-dropped { background: var(--soft); color: var(--muted); }
+.v-admin .v-admin-slot .v-admin-form { margin-top: 10px; }
+
+/* Seats on the slot screen */
+.v-admin .v-admin-seats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.v-admin .v-admin-seat { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.v-admin .v-admin-seat > * + * { margin-top: 3px; }
+.v-admin .v-admin-seat-out { background: var(--soft); }
+.v-admin .v-admin-seat .row { gap: 6px; }

@@ -1,0 +1,16 @@
+/* css/views/signin.css — course link landing, sign-in and link-sent screens. Every rule is prefixed .v-signin. */
+
+.v-signin { max-width: 380px; margin: 8px auto 0; }
+.v-signin h1 { margin: 8px 0 6px; }
+.v-signin .v-signin-intro { margin-bottom: 18px; }
+.v-signin .v-signin-course { margin: 6px 0 12px; }
+.v-signin .v-signin-form .field { margin-bottom: 4px; }
+.v-signin .v-signin-hint { margin: 0 0 14px; }
+.v-signin .v-signin-sent { padding-top: 16px; }
+.v-signin .v-signin-mail {
+  width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--info-bg); color: var(--navy); font-size: 30px;
+}
+.v-signin .v-signin-addr { overflow-wrap: anywhere; margin-top: 0; }
+.v-signin .v-signin-course .card-sub { margin-bottom: 0; }

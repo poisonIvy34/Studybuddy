@@ -1,0 +1,9 @@
+/* css/views/me.css — styles for js/views/me.js only. Every rule is prefixed with .v-me */
+.v-me h1 { margin: 4px 0 12px; }
+.v-me .v-me-status .strong { margin-bottom: 2px; }
+.v-me .v-me-note { margin: 10px 0 0; }
+.v-me .card-row > :last-child { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.v-me .v-me-choice-hint { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.v-me .v-me-delete p { margin: 6px 0 10px; }
+.v-me .v-me-delete .btn-group .btn { flex: 1 1 auto; }
+.v-me .v-me-section { white-space: nowrap; }

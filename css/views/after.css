@@ -1,0 +1,19 @@
+/* css/views/after.css — post-session question and exit survey. Every rule is prefixed with .v-after. */
+.v-after .v-after-head h1 { margin: 2px 0 4px; }
+.v-after .v-after-head p { margin: 0; }
+.v-after .v-after-q h2 { margin-top: 0; }
+.v-after .v-after-done { text-align: center; }
+.v-after .v-after-done h2 { margin: 8px 0 4px; }
+.v-after .v-after-check {
+  width: 44px; height: 44px; margin: 4px auto 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ok-bg); color: var(--ok); font-size: 22px; font-weight: 700;
+}
+.v-after .v-after-next .btn { margin-top: 4px; }
+.v-after .v-after-question { margin-bottom: 18px; }
+.v-after .v-after-question .field-label { line-height: 1.35; }
+.v-after .v-after-yesno { display: flex; gap: 8px; }
+.v-after .v-after-yesno .choice { text-align: center; flex: 1; }
+.v-after .v-after-nps { gap: 4px; flex-wrap: nowrap; }
+.v-after .v-after-nps button { flex: 1 1 0; min-width: 0; padding: 0; }
+.v-after .v-after-ends { margin-top: 4px; }

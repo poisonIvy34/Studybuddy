@@ -1,0 +1,48 @@
+/* css/views/onboarding.css — sign-up steps. Every rule is prefixed with .v-onboarding. */
+
+.v-onboarding .v-onboarding-head { margin-bottom: 12px; }
+.v-onboarding .v-onboarding-back { padding-left: 0; }
+.v-onboarding .v-onboarding-back-spacer { display: inline-block; min-height: 36px; }
+
+.v-onboarding .v-onboarding-steps {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+}
+.v-onboarding .v-onboarding-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--muted); text-align: center; min-width: 0;
+}
+.v-onboarding .v-onboarding-step::before {
+  content: ""; display: block; width: 100%; height: 3px; border-radius: 2px; background: var(--line);
+}
+.v-onboarding .v-onboarding-step.done::before,
+.v-onboarding .v-onboarding-step.current::before { background: var(--navy); }
+.v-onboarding .v-onboarding-dot {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; border: 1px solid var(--line); background: var(--surface);
+}
+.v-onboarding .v-onboarding-step.done .v-onboarding-dot { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+.v-onboarding .v-onboarding-step.current { color: var(--navy); font-weight: 600; }
+.v-onboarding .v-onboarding-step.current .v-onboarding-dot { background: var(--navy); color: #fff; border-color: var(--navy); }
+.v-onboarding .v-onboarding-step-label { overflow-wrap: anywhere; line-height: 1.2; }
+
+.v-onboarding .v-onboarding-choice-sub { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.v-onboarding .v-onboarding-years { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.v-onboarding .v-onboarding-years .choice,
+.v-onboarding .v-onboarding-yesno .choice { text-align: center; }
+.v-onboarding .v-onboarding-yesno { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.v-onboarding .v-onboarding-conduct {
+  max-height: 300px; overflow-y: auto; padding: 12px; margin-bottom: 12px;
+  background: var(--soft); border: 1px solid var(--line); border-radius: 10px; font-size: 14px;
+}
+.v-onboarding .v-onboarding-conduct p { margin: 0 0 10px; white-space: pre-line; }
+.v-onboarding .v-onboarding-conduct p:first-child { font-weight: 700; }
+.v-onboarding .v-onboarding-conduct p:last-child { margin-bottom: 0; }
+
+.v-onboarding .v-onboarding-q .field-label { line-height: 1.35; }
+.v-onboarding .v-onboarding-req { color: var(--bad); }
+
+.v-onboarding .v-onboarding-perm { margin-bottom: 12px; }
+.v-onboarding .v-onboarding-perm-status { margin: 8px 0 0; min-height: 1em; }

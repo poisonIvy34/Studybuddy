@@ -1,0 +1,39 @@
+/* css/views/exams.css — screen-specific rules for #/exams and #/session/:id. Every rule is prefixed with .v-exams. */
+
+.v-exams h1 { margin-bottom: 12px; }
+.v-exams .section-title { margin: 16px 0 8px; }
+
+/* Session cards on the exam view are links */
+.v-exams a.v-exams-session { display: block; color: inherit; text-decoration: none; }
+.v-exams a.v-exams-session:hover { border-color: var(--navy-2); }
+.v-exams .v-exams-sessions { display: flex; flex-direction: column; gap: 8px; }
+.v-exams .v-exams-sessions > .card { margin-bottom: 0; }
+.v-exams .v-exams-st-cancelled,
+.v-exams .v-exams-st-released { border-left-color: var(--line); }
+.v-exams .v-exams-st-no_show { border-left-color: var(--bad); }
+.v-exams .v-exams-st-placed { border-left-color: var(--navy-2); }
+.v-exams .v-exams-post { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--navy-2); }
+
+.v-exams .v-exams-past { margin: 12px 0 4px; }
+.v-exams .v-exams-past > summary { cursor: pointer; font-size: 14px; color: var(--muted); padding: 6px 0; }
+.v-exams .v-exams-past[open] > summary { margin-bottom: 8px; }
+
+/* Dropped-slot suggestion */
+.v-exams .v-exams-suggest { border-left: 4px solid var(--warn); }
+.v-exams .v-exams-suggest .section-title { margin-top: 0; }
+.v-exams .v-exams-suggest-row { margin-top: 8px; }
+.v-exams .v-exams-suggest-row .grow { min-width: 0; }
+
+/* Session screen */
+.v-exams .v-exams-back { display: inline-block; margin: 0 0 8px -4px; font-size: 14px; }
+.v-exams .v-exams-detail .session-when { margin: 4px 0 2px; }
+.v-exams .v-exams-tags { gap: 6px; margin-top: 8px; }
+.v-exams .v-exams-actions { margin: 4px 0 12px; }
+.v-exams .v-exams-actions .btn { flex: 1 1 140px; }
+.v-exams .v-exams-cancel { margin-bottom: 12px; }
+.v-exams .v-exams-postlink { margin-bottom: 12px; text-align: center; justify-content: center; }
+
+.v-exams .v-exams-mate { flex-direction: column; align-items: stretch; }
+.v-exams .v-exams-mate-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.v-exams .v-exams-report { margin-top: 8px; }
+.v-exams .v-exams-report textarea { width: 100%; }
