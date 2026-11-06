@@ -188,7 +188,7 @@
   ];
 
   SB.seed = {
-    version: 2,
+    version: 3,
     seq: 100,
     jobs: { surveyOpenSent: false },
     demo: { now: t("16T12:00"), currentUserId: null, location: "in_range", pendingLinkCode: null },
@@ -242,7 +242,7 @@
     ],
 
     conductText: // PLACEHOLDER
-      "StudyBuddy code of conduct\n\n" +
+      "Prepd code of conduct\n\n" +
       "1. Show up when you say you will. If plans change, tap Can't make it so your group knows. No hard feelings.\n" +
       "2. Respect your table's type: quiet tables stay quiet, chatty tables keep it about the class.\n" +
       "3. Be kind. No harassment, pressure or unwanted contact, during or after a session.\n" +
@@ -250,6 +250,17 @@
       "5. Report anything that made you feel unsafe or uncomfortable. Reports are private and reviewed within 24 hours.\n\n" +
       "If you say you're still coming and then don't show, that's a miss. Misses reset each exam. After 2 misses in one " +
       "exam, you'll confirm a little earlier so your group can count on a full table.",
+
+    ads: [ // PLACEHOLDER sample ads (D42). Every business is made up.
+      { id: "ad_owl", business: "Night Owl Cookie Co.", text: "Studying late? Warm cookies delivered until 2 AM.",
+        offer: "Free cookie with any order after 9 PM. Show this card." },
+      { id: "ad_bagel", business: "Sunrise Bagel Bar", text: "Exam-day breakfast, ready in 3 minutes.",
+        offer: "$1 off any bagel sandwich before 11 AM." },
+      { id: "ad_print", business: "Corner Copy & Print", text: "Study guides, flash cards and posters, two blocks from campus.",
+        offer: "5¢ a page for students all exam week." },
+      { id: "ad_boba", business: "Steep & Study Tea House", text: "Quiet tables, outlets everywhere, and real boba.",
+        offer: "Buy one, get one half off with a study group of 3 or more." }
+    ],
 
     surveys: { // PLACEHOLDER questions
       intake: [
@@ -260,8 +271,8 @@
       ],
       exit: [
         { id: "q_ex_connect", text: "Do you know someone in this class to study with?", type: "yesno", isConnection: true },
-        { id: "q_ex_focus", text: "Compared with studying alone, how focused were you at StudyBuddy sessions? (1 = much less, 5 = much more)", type: "scale5" },
-        { id: "q_ex_again", text: "Would you use StudyBuddy again next semester?", type: "choice", options: ["Yes", "Maybe", "No"] },
+        { id: "q_ex_focus", text: "Compared with studying alone, how focused were you at Prepd sessions? (1 = much less, 5 = much more)", type: "scale5" },
+        { id: "q_ex_again", text: "Would you use Prepd again next semester?", type: "choice", options: ["Yes", "Maybe", "No"] },
         { id: "q_ex_comment", text: "What should we change? (optional)", type: "text" }
       ]
     },

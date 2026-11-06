@@ -12,7 +12,7 @@
     { value: "less", label: "Less prepared" }
   ];
   var POST_LABEL = { more: "More prepared", same: "About the same", less: "Less prepared" };
-  var NPS_TEXT = "How likely are you to recommend StudyBuddy to a classmate?";
+  var NPS_TEXT = "How likely are you to recommend Prepd to a classmate?";
 
   // Unsent choices survive re-renders (the router redraws on every state change).
   var postDraft = {};   // seatId -> "more" | "same" | "less"
@@ -221,7 +221,7 @@
       root.appendChild(h("div", { class: "card v-after-done" },
         h("div", { class: "v-after-check", "aria-hidden": "true" }, "✓"),
         h("h2", null, "Thanks, " + stu.firstName + "!"),
-        h("p", { class: "muted" }, "Your answers help us decide what StudyBuddy does next.")
+        h("p", { class: "muted" }, "Your answers help us decide what Prepd does next.")
       ));
       root.appendChild(backLink(h));
       return;

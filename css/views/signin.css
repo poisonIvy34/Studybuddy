@@ -14,3 +14,17 @@
 }
 .v-signin .v-signin-addr { overflow-wrap: anywhere; margin-top: 0; }
 .v-signin .v-signin-course .card-sub { margin-bottom: 0; }
+
+/* Brand welcome (D41) */
+.v-signin .v-signin-hero {
+  margin: -28px -18px 22px; padding: 28px 22px 26px; text-align: center; color: #fff;
+  background: var(--grad); border-radius: 0 0 28px 28px;
+}
+.v-signin .v-signin-logo {
+  width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 20px 20px 20px 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--grad-warm); color: var(--accent); font-size: 34px; font-weight: 900;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+.v-signin .v-signin-word { font-size: 34px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
+.v-signin .v-signin-tag { margin: 8px 0 0; font-size: 15px; opacity: 0.92; }

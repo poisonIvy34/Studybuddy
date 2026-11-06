@@ -18,7 +18,7 @@ If the two disagree, the PRD wins. Point out the conflict instead of picking a s
 7. **Only `js/store.js` writes state.** Every other file reads state and calls store actions.
 8. **Time comes only from the demo clock** (`SB.clock.now()`), never `new Date()` for "now". Times display in Mountain Time (`America/Denver`).
 9. **Don't guess.** If the PRD and this file don't answer a question, ask Ella before building it. Put new decisions in [Decisions made for the prototype](#decisions-made-for-the-prototype). Items under **Still open** are not to be built until answered.
-10. **Keep what's out of scope out.** Out of scope: the PRD's "Out of scope" table, every "Nice to have" (add-to-calendar, professor dashboard, bring a friend), CSV export, ads, Sentry or any other monitoring, and the PRD's 90-day data retention.
+10. **Keep what's out of scope out.** Out of scope: the PRD's "Out of scope" table, every "Nice to have" (add-to-calendar, professor dashboard, bring a friend), CSV export, real ads (sample ads are in scope, D42), Sentry or any other monitoring, and the PRD's 90-day data retention.
 
 ## Hard product rules (from the PRD — do not change)
 
@@ -124,6 +124,8 @@ D36–D40 were decided on 2026-11-02. They replace the PRD's strike system (stri
 | D38 | What students see | Each miss sends one private `miss_notice`: the 1st is gentle ("Life happens!…"); one that brings the class to 2 explains confirming early. `#/me` shows "You've shown up to X of Y sessions you said you'd come to" (Y = attended + no-shows whose miss wasn't removed). Never shown to anyone else. |
 | D39 | The consequence of 2 recent misses | At lock, a seat whose student has 2+ recent misses in that class gets `earlyConfirm: true` (fixed for that seat). Still coming / Can't make it are available from lock until T−3h; "Still coming?" is sent at T−24h; no answer by T−3h releases the seat with no miss. **There is no pause.** Seats aren't changed afterwards, by later misses or by removing one. "Reliable students placed first" is not built: slots have no seat limit, so nobody is ever left out. |
 | D40 | Backing out | One tap on **Can't make it**, no confirmation dialog, with "No problem, we'll let your group know. Thanks for the heads-up!". The others still at the table get `mate_cancelled` naming the student by first name. Never a miss. |
+| D41 | The name StudyBuddy is taken (decided 2026-11-06) | The app shows the name **Prepd** everywhere a user sees it. PRD.md and this file keep "StudyBuddy" as the project name. |
+| D42 | Sample ads (decided 2026-11-06; departs from the PRD, which keeps ads off in the pilot) | One sample ad for a made-up local business shows below the exams on `#/exams`, always on and labeled "Sample ad". It shows the PRD's "local ads" revenue backup. Ads come from `seed.ads` (PLACEHOLDER), one per MT calendar day, in order. They have no link and record nothing. |
 
 How the prototype reads the PRD (interpretations, not new rules):
 - Both Ella and Ash are admins, each with their own account and the same rights.
@@ -163,7 +165,7 @@ Hash routes, handled by `js/router.js`. Guards:
 | `#/join/:linkCode` | Course link landing: course name and section, then sign in. Adds the course after sign-in. If the student is already signed in and has finished sign-up, the course is added right away and they go to `#/exams`. If they're signed in but not finished, the course is added and they continue sign-up. An unknown code shows "This link isn't valid" and nothing else. |
 | `#/signin` | Email field. A `@byu.edu` email → "Link sent" screen with an **Open link (demo)** button. Any other email → rejected with a message. Tapping **Open link (demo)** signs the user in. An admin's email opens the admin console. A known student's email signs that student in. A new email creates the student record (profile fields `null`) and adds the pending course, if there is one. No notification record is made for sign-in. |
 | `#/onboarding/profile` → `conduct` → `intake` → `permissions` | One-time sign-up steps, in order. You can go back but not skip ahead. |
-| `#/exams` | Home. Upcoming exams for each of the student's courses, each with its candidate slots. Each slot shows its pick count, type, place and a pick toggle. Locked sessions appear at the top. An exam shows until its `at` time. Under each exam, only `open` slots are listed, sorted with the student's preferred type first and then by start time. The student's own sessions (any seat status) appear at the top. Dropped slots, and locked slots where they have no seat, are hidden. |
+| `#/exams` | Home. Upcoming exams for each of the student's courses, each with its candidate slots. Each slot shows its pick count, type, place and a pick toggle. Locked sessions appear at the top. An exam shows until its `at` time. Under each exam, only `open` slots are listed, sorted with the student's preferred type first and then by start time. The student's own sessions (any seat status) appear at the top. Dropped slots, and locked slots where they have no seat, are hidden. One sample ad shows below the exams (D42). |
 | `#/session/:id` | A locked session: time, spot, tablemates (first name and year) each with Report a concern, then **Still coming** / **Can't make it** (D40). I'm here is in the check-in bar (below). |
 | `#/after/:id` | "Who did you study with?" (tablemates' first names to tap, D36), the post-session question, then a prompt to pick times for the next exam. Open for 24h. |
 | `#/me` | The student's own shown-up record (D38) and early-confirm note if any (D39), profile and preference (editable), the student's classes with **Add a class**, settings, sign out, delete account. |
@@ -199,7 +201,7 @@ Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` t
 
 `js/data.js` sets `window.SB.seed`, which has the shape below. `localStorage` holds the same shape. Field names are fixed; adding a field means updating this section first.
 
-- IDs are strings with a prefix (`stu_`, `adm_`, `crs_`, `exm_`, `slt_`, `pck_`, `ses_`, `set_`, `chk_`, `mis_`, `rpt_`, `ntf_`).
+- IDs are strings with a prefix (`stu_`, `adm_`, `crs_`, `exm_`, `slt_`, `pck_`, `ses_`, `set_`, `chk_`, `mis_`, `rpt_`, `ntf_`, `ad_`).
   - New IDs come only from `SB.rules.nextId(state, prefix)`. It increments `state.seq` and returns `prefix + seq`, for example `"ntf_57"`. There are no random IDs, so tests are repeatable.
   - Seed IDs are hand-written and readable, for example `"slt_stat121_mon"`.
 - Times are ISO 8601 strings with an offset, e.g. `"2026-11-17T16:00:00-07:00"`.
@@ -214,7 +216,7 @@ Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` t
 
 ```js
 SB.seed = {
-  version: 2,                       // bump when this shape changes; older saved states are replaced by the seed
+  version: 3,                       // bump when this shape changes; older saved states are replaced by the seed
   seq: number,                      // last number used by nextId; the seed sets it above every seeded number
   jobs: { surveyOpenSent: bool },   // global timeline job: survey_open sent at settings.pilotEnd
   demo: { now: ISO, currentUserId: "stu_…" | "adm_…" | null, location: "in_range" | "out_of_range" | "denied",
@@ -241,6 +243,7 @@ SB.seed = {
   }],
 
   conductText: string,                              // PLACEHOLDER
+  ads: [{ id: "ad_…", business: string, text: string, offer: string }],   // PLACEHOLDER; sample ads for fictional businesses (D42)
   surveys: { intake: [Question], exit: [Question] }, // PLACEHOLDER; one question per survey has isConnection: true
   // Question = { id: string, text: string, type: "yesno" | "scale5" | "choice" | "text", options?: [string], isConnection?: boolean }
 

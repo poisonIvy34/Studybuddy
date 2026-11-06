@@ -19,11 +19,11 @@
   }
   function save() {
     try { window.localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (e) { console.warn("StudyBuddy: could not save state", e); }
+    catch (e) { console.warn("Prepd: could not save state", e); }
   }
   function emit() {
     subs.slice().forEach(function (fn) {
-      try { fn(state); } catch (e) { console.error("StudyBuddy: subscriber failed", e); }
+      try { fn(state); } catch (e) { console.error("Prepd: subscriber failed", e); }
     });
   }
   function setState(next) {
@@ -70,7 +70,7 @@
       setState(SB.rules.tick(cur, newNow));
       return { ok: true };
     } catch (e) {
-      console.error("StudyBuddy: advance failed", e);
+      console.error("Prepd: advance failed", e);
       return { ok: false, error: "Something went wrong moving the clock." };
     }
   }
@@ -84,7 +84,7 @@
     try {
       r = fn.apply(null, [cur, SB.clock.now(), cur.demo.currentUserId].concat(args));
     } catch (e) {
-      console.error("StudyBuddy: action " + name + " failed", e);
+      console.error("Prepd: action " + name + " failed", e);
       return { ok: false, error: "Something went wrong." };
     }
     if (r.error) return { ok: false, error: r.error };

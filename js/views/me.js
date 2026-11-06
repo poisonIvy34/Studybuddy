@@ -63,7 +63,7 @@
         done
           ? h("p", { class: "muted small" }, "Thanks, you've answered the pilot survey.")
           : [
-              h("p", { class: "card-sub" }, "The pilot is wrapping up. Tell us how StudyBuddy went. It takes about 2 minutes."),
+              h("p", { class: "card-sub" }, "The pilot is wrapping up. Tell us how Prepd went. It takes about 2 minutes."),
               h("a", { class: "btn btn-primary btn-block", href: "#/survey/exit" }, "Take the survey")
             ]
       ));

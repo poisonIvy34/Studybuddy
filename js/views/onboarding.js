@@ -314,7 +314,7 @@
       page(
         "intake",
         "A quick survey",
-        "This helps us learn whether StudyBuddy works. Questions marked * are required.",
+        "This helps us learn whether Prepd works. Questions marked * are required.",
         h(
           "div",
           { class: "card" },
@@ -339,7 +339,7 @@
       function showStatus() {
         status.textContent =
           perms[key] === "allow" ? "Allowed." :
-          perms[key] === "deny" ? "Not allowed. You can still use StudyBuddy." : "";
+          perms[key] === "deny" ? "Not allowed. You can still use Prepd." : "";
         status.className = "small v-onboarding-perm-status " + (perms[key] === "allow" ? "success" : "muted");
       }
       showStatus();

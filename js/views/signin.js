@@ -123,7 +123,11 @@
     var h = SB.ui.h;
     function redraw() { draw(mount, course, routeKey); }
     mount.innerHTML = "";
-    var body = ui.sentTo ? linkSent(h, redraw) : h("div", null, intro(h, course), emailForm(h, mount, redraw));
+    var hero = h("div", { class: "v-signin-hero" },
+      h("div", { class: "v-signin-logo", "aria-hidden": "true" }, "P"),
+      h("div", { class: "v-signin-word" }, "Prepd"),
+      h("p", { class: "v-signin-tag" }, "Study together. Show up prepared."));
+    var body = ui.sentTo ? linkSent(h, redraw) : h("div", null, hero, intro(h, course), emailForm(h, mount, redraw));
     mount.appendChild(h("div", { class: "v-signin" }, body));
     if (!ui.sentTo) {
       var el = mount.querySelector("#signin-email");

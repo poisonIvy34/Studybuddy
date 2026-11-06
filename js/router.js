@@ -188,7 +188,7 @@
 
   function brand() {
     var h = ui().h;
-    return h("span", { class: "brand" }, h("span", { class: "brand-mark", "aria-hidden": "true" }, "S"), "StudyBuddy");
+    return h("span", { class: "brand" }, h("span", { class: "brand-mark", "aria-hidden": "true" }, "P"), "Prepd");
   }
 
   // The check-in bar: one per seat whose I'm here is open right now (SB.rules.seatActions decides).

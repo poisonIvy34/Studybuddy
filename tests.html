@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StudyBuddy rule checks</title>
+<title>Prepd rule checks</title>
 <style>
   body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 16px; color: #1b1b1b; background: #fff; }
   h1 { font-size: 18px; margin: 0 0 4px; }
@@ -14,7 +14,7 @@
 </style>
 </head>
 <body>
-<h1>StudyBuddy — rule checks</h1>
+<h1>Prepd — rule checks</h1>
 <div id="summary">Running…</div>
 <div id="out"></div>
 
@@ -103,8 +103,8 @@
   section("Seed shape and consistency");
   safe("seed", function () {
     var s = SB.seed;
-    check("seed has version 2 and every top-level field", s.version === 2 && ["seq", "jobs", "demo", "settings", "admins",
-      "courses", "exams", "slots", "conductText", "surveys", "students", "picks", "sessions", "seats", "checkins", "misses",
+    check("seed has version 3 and every top-level field", s.version === 3 && ["seq", "jobs", "demo", "settings", "admins",
+      "courses", "exams", "slots", "conductText", "ads", "surveys", "students", "picks", "sessions", "seats", "checkins", "misses",
       "reports", "postAnswers", "surveyAnswers", "notifications"].every(function (k) { return k in s; }));
     eq("demo.currentUserId and pendingLinkCode are null", [s.demo.currentUserId, s.demo.pendingLinkCode], [null, null]);
     check("2-3 courses, each with 2 exams", s.courses.length >= 2 && s.courses.length <= 3 && s.courses.every(function (c) {
@@ -871,7 +871,7 @@
   var sum = document.getElementById("summary");
   sum.textContent = "PASSED " + passed + " / FAILED " + failed;
   sum.className = failed ? "fail" : "pass";
-  document.title = (failed ? "FAIL " : "PASS ") + passed + "/" + (passed + failed) + " — StudyBuddy rule checks";
+  document.title = (failed ? "FAIL " : "PASS ") + passed + "/" + (passed + failed) + " — Prepd rule checks";
 })();
 </script>
 </body>

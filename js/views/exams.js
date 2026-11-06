@@ -175,6 +175,23 @@
       h("label", { class: "slot-toggle toggle" }, input, h("span", { class: "toggle-ui" })));
   }
 
+  // D42: one sample ad for a made-up local business, one per MT calendar day, in seed order.
+  function adCard(state, now) {
+    var ads = state.ads || [];
+    if (!ads.length) return null;
+    var dayNum = Math.floor(Date.UTC(+now.slice(0, 4), +now.slice(5, 7) - 1, +now.slice(8, 10)) / 86400000);
+    var ad = ads[dayNum % ads.length];
+    return h("aside", { class: "v-exams-ad", "aria-label": "Sample ad" },
+      h("div", { class: "v-exams-ad-top" },
+        h("span", { class: "v-exams-ad-logo", "aria-hidden": "true" }, ad.business.charAt(0)),
+        h("div", { class: "grow" },
+          h("div", { class: "v-exams-ad-biz" }, ad.business),
+          h("div", { class: "v-exams-ad-local" }, "Local partner")),
+        h("span", { class: "v-exams-ad-label" }, "Sample ad")),
+      h("p", { class: "v-exams-ad-text" }, ad.text),
+      h("div", { class: "v-exams-ad-offer" }, ad.offer));
+  }
+
   function renderExams(params, mount) {
     var state = SB.store.get(), now = SB.clock.now(), me = state.demo.currentUserId;
     var data = SB.rules.examsFor(state, now, me);
@@ -223,6 +240,8 @@
             : SB.ui.empty("No open times for this exam right now.")));
       });
     }
+
+    var ad = adCard(state, now); if (ad) root.appendChild(ad);
 
     mount.appendChild(root);
   }
@@ -322,13 +341,13 @@
       ta.value = reportDraft;
       li.appendChild(h("div", { class: "v-exams-report" },
         h("p", { class: "small muted" }, "For safety or conduct concerns, like harassment or feeling unsafe. " +
-          "Not for attendance: you never need to tell us who didn't come. Reports are private; only the StudyBuddy team sees them."),
+          "Not for attendance: you never need to tell us who didn't come. Reports are private; only the Prepd team sees them."),
         ta,
         h("div", { class: "btn-group mt" },
           SB.ui.button("Send report", function () {
             var text = reportDraft.trim();
             reportOpen = null; reportDraft = "";
-            act(SB.store.report(session.id, m.studentId, text), "Report sent. The StudyBuddy team will review it.");
+            act(SB.store.report(session.id, m.studentId, text), "Report sent. The Prepd team will review it.");
           }, { kind: "danger", class: "btn-small" }),
           SB.ui.button("Never mind", function () { reportOpen = null; reportDraft = ""; SB.router.render(); },
             { kind: "secondary", class: "btn-small" }))));
