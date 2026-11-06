@@ -32,7 +32,7 @@
       name: "email",
       autocomplete: "email",
       inputmode: "email",
-      placeholder: "netid@byu.edu",
+      placeholder: "you@byu.edu",
       value: ui.draft,
       "aria-invalid": ui.error ? "true" : null,
       "aria-describedby": "signin-hint",
@@ -56,7 +56,7 @@
     return h(
       "form",
       { class: "v-signin-form", novalidate: true, onsubmit: submit },
-      SB.ui.field("BYU email", input),
+      SB.ui.field("School email", input),
       h("span", { class: "field-hint v-signin-hint", id: "signin-hint" }, "Only @byu.edu addresses can sign in. We'll email you a one-time link, no password."),
       ui.error ? h("div", { class: "notice notice-error", role: "alert" }, ui.error) : null,
       h("button", { type: "submit", class: "btn btn-primary btn-block" }, "Email me a sign-in link")
@@ -108,14 +108,14 @@
           h("div", { class: "card-title" }, course.name),
           h("div", { class: "card-sub" }, "Section " + course.section)
         ),
-        h("p", { class: "muted" }, "Find a study group for your next exam. Sign in with your BYU email to add this course.")
+        h("p", { class: "muted" }, "Find a study group for your next exam. Sign in with your school email to add this course.")
       );
     }
     return h(
       "div",
       { class: "v-signin-intro" },
       h("h1", null, "Sign in"),
-      h("p", { class: "muted" }, "Study with classmates before your exams. Sign in with your BYU email.")
+      h("p", { class: "muted" }, "Study with classmates before your exams. Sign in with your school email.")
     );
   }
 

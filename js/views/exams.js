@@ -3,17 +3,16 @@
  * Every decision (what is listed, who can pick, which seat buttons show, who the tablemates are)
  * comes from SB.rules. This file only draws what rules return and calls SB.store actions.
  * Privacy: slots show counts only; tablemates show first name and year only (D12). Nothing about
- * another student's status, email, strikes or check-ins is ever drawn here.
+ * another student's status, email, misses or check-ins is ever drawn here.
  */
 (function () {
   var SB = (window.SB = window.SB || {});
 
   // Screen-local UI state (not product state): a message to show after an action,
-  // the open report form and its draft, and the pending "Cancel?" question.
+  // and the open report form and its draft.
   var flash = null;          // { path, kind: "ok" | "error" | "warn" | "info", text }
   var reportOpen = null;     // studentId whose report form is open
   var reportDraft = "";
-  var cancelAsk = null;      // seatId awaiting "are you sure"
 
   function h() { return SB.ui.h.apply(null, arguments); }
   function fmt(iso, kind) { return SB.clock.fmt(iso, kind); }
@@ -46,11 +45,11 @@
   // ---------- seat status in friendly words (the student's own seat only) ----------
   var STATUS_TAG = {
     placed: ["You're in", "tag-info"],
-    confirmed: ["Confirmed", "tag-ok"],
-    attended: ["Checked in", "tag-ok"],
-    cancelled: ["Cancelled", "tag-muted"],
-    released: ["Released", "tag-muted"],
-    no_show: ["Missed", "tag-bad"]
+    confirmed: ["Still coming", "tag-ok"],
+    attended: ["You came", "tag-ok"],
+    cancelled: ["Can't make it", "tag-muted"],
+    released: ["Seat released", "tag-muted"],
+    no_show: ["Missed", "tag-warn"]
   };
   function statusTag(seat) {
     var t = STATUS_TAG[seat.status] || [seat.status, "tag-muted"];
@@ -59,25 +58,31 @@
 
   function statusText(state, now, seat, slot, actions) {
     var s = state.settings;
-    var n = SB.clock.toMs(now), T = SB.clock.toMs(slot.start);
+    var n = SB.clock.toMs(now), T = SB.clock.toMs(slot.start), E = SB.clock.toMs(slot.end);
     switch (seat.status) {
       case "placed":
-        if (actions.canConfirm) return "Still coming? Let your table know.";
-        if (n < T) return "You're in. We'll ask you to confirm at " +
+        if (seat.earlyConfirm && actions.canConfirm) return "Your group is counting on you. Please tap Still coming by " +
+          fmt(SB.clock.add(slot.start, { hours: -s.earlyConfirmByHoursBefore }), "dayTime") + " to keep your seat.";
+        if (actions.canConfirm && actions.canCheckIn) return "Still coming? Tell your group below, or tap I'm here at the top once you reach the spot.";
+        if (actions.canConfirm) return "Still coming? Let your group know.";
+        if (n < T) return "You're in. We'll ask if you're still coming at " +
           fmt(SB.clock.add(slot.start, { minutes: -s.confirmMinutesBefore }), "dayTime") + ".";
         return "You're in.";
       case "confirmed":
-        if (actions.canCheckIn) return "You're confirmed. Tap I'm here when you reach the spot.";
-        if (n < T) return "You're confirmed. I'm here opens at " +
+        if (actions.canCheckIn) return "Your group knows you're coming. Tap I'm here at the top when you reach the spot.";
+        if (n < T) return "Your group knows you're coming. I'm here opens at " +
           fmt(SB.clock.add(slot.start, { minutes: -s.checkInOpensMinutesBefore }), "time") + ".";
-        return "You're confirmed.";
-      case "attended": return "You checked in. Thanks for coming!";
+        if (n >= E) return "The session's over. If you were there, a tablemate can still say you studied together until " +
+          fmt(SB.clock.add(slot.end, { hours: s.postWindowHours }), "dayTime") + ".";
+        return "Your group knows you're coming.";
+      case "attended": return "You made it. Thanks for showing up for your group!";
       case "cancelled":
-        if (seat.cancelReason === "cant_make_it") return "You told us you can't make it. No strike.";
-        if (seat.cancelReason === "strike_pause") return "Cancelled because your sign-ups are paused.";
-        return "You cancelled this session. No strike.";
-      case "released": return "You didn't confirm in time, so your seat was released. No strike.";
-      case "no_show": return "You confirmed but didn't check in, so this counted as a no-show.";
+        if (seat.cancelReason === "cant_make_it" || seat.cancelReason === "student") {
+          return "No problem, we let your group know. Thanks for the heads-up!";
+        }
+        return "This seat was cancelled.";
+      case "released": return "We didn't hear back, so your seat was released. That's not a miss.";
+      case "no_show": return "You said you were coming but nobody saw you there, so this counted as a miss. Life happens!";
       default: return "";
     }
   }
@@ -146,9 +151,9 @@
       post ? h("div", { class: "v-exams-post" }, "How did it go? Tap to answer.") : null);
   }
 
-  function slotRow(item, paused) {
+  function slotRow(item) {
     var slot = item.slot;
-    var disabled = paused || (!item.picked && !item.canPick);
+    var disabled = !item.picked && !item.canPick;
     var input = h("input", {
       type: "checkbox",
       checked: item.picked,
@@ -178,11 +183,6 @@
     root.appendChild(h("h1", null, "Your exams"));
     var f = takeFlash(); if (f) root.appendChild(f);
 
-    if (data.pausedUntil) {
-      root.appendChild(h("div", { class: "notice notice-warn" },
-        "Sign-ups are paused until " + fmt(data.pausedUntil, "full") + ". You can't pick times until then."));
-    }
-
     suggestionCards(state, now, me).forEach(function (c) { root.appendChild(c); });
 
     var upcoming = data.sessions.filter(function (s) { return s.upcoming; });
@@ -198,12 +198,17 @@
         h("div", { class: "v-exams-sessions" }, past.map(function (s) { return sessionCard(state, now, s); }))));
     }
 
+    var addLink = h("a", { class: "btn btn-primary btn-block", href: "#/classes" }, "+ Add a class");
     if (data.noCourses) {
-      root.appendChild(SB.ui.empty("Open your course link to add a course."));
+      root.appendChild(h("div", { class: "empty v-exams-noclass" },
+        h("p", null, "Add your classes to see their exams and study times."), addLink));
     } else if (!data.exams.length) {
-      root.appendChild(SB.ui.empty("No upcoming exams in your courses right now."));
+      root.appendChild(SB.ui.empty("No upcoming exams in your classes right now."));
+      root.appendChild(h("a", { class: "btn btn-secondary btn-block", href: "#/classes" }, "+ Add a class"));
     } else {
-      root.appendChild(h("div", { class: "section-title" }, "Pick study times"));
+      root.appendChild(h("div", { class: "row-between v-exams-pickhead" },
+        h("div", { class: "section-title" }, "Pick study times"),
+        h("a", { class: "btn-link small", href: "#/classes" }, "+ Add a class")));
       root.appendChild(h("p", { class: "muted small" },
         "Pick as many times as you like. A time becomes a session 48 hours before it starts if 3 or more people picked it."));
       data.exams.forEach(function (e) {
@@ -214,7 +219,7 @@
               h("div", { class: "muted small" }, courseLabel(e.course))),
             h("div", { class: "exam-date" }, fmt(e.exam.at, "day"))),
           e.slots.length
-            ? h("div", { class: "slot-list" }, e.slots.map(function (s) { return slotRow(s, !!data.pausedUntil); }))
+            ? h("div", { class: "slot-list" }, e.slots.map(function (s) { return slotRow(s); }))
             : SB.ui.empty("No open times for this exam right now.")));
       });
     }
@@ -238,7 +243,6 @@
       mount.appendChild(root);
       return;
     }
-    if (cancelAsk && cancelAsk !== seat.id) cancelAsk = null;
 
     var exam = find(state.exams, slot.examId);
     var course = exam && find(state.courses, exam.courseId);
@@ -263,38 +267,20 @@
 
     var cn = checkinNotice(state, seat); if (cn) root.appendChild(cn);
 
-    // Actions, exactly as rules allow
+    // Actions, exactly as rules allow. I'm here lives in the check-in bar at the top (router.js).
+    // D40: one-tap, blame-free backing out. "Can't make it" is the only way out shown;
+    // it uses cantMakeIt inside the Still coming? window and cancel outside it (both no miss).
     var btns = [];
     if (actions.canConfirm) {
-      btns.push(SB.ui.button("Confirm", function () { act(SB.store.confirm(seat.id), "Confirmed. See you there!"); }, { kind: "primary" }));
+      btns.push(SB.ui.button("Still coming", function () { act(SB.store.confirm(seat.id), "Great, your group knows you're coming. See you there!"); }, { kind: "primary" }));
+    }
+    if (actions.canCantMakeIt || actions.canCancel) {
       btns.push(SB.ui.button("Can't make it", function () {
-        act(SB.store.cantMakeIt(seat.id), "Got it. Your table will know you can't make it. No strike.");
+        act(actions.canCantMakeIt ? SB.store.cantMakeIt(seat.id) : SB.store.cancel(seat.id),
+          "No problem, we'll let your group know. Thanks for the heads-up!");
       }, { kind: "secondary" }));
     }
-    if (actions.canCheckIn) {
-      btns.push(SB.ui.button("I'm here", function () {
-        var r = SB.store.checkIn(seat.id);
-        if (!r.ok) act(r); else SB.router.render(); // the check-in notice shows the result
-      }, { kind: "primary", class: "v-exams-here" }));
-    }
     if (btns.length) root.appendChild(h("div", { class: "btn-group v-exams-actions" }, btns));
-
-    if (actions.canCancel) {
-      if (cancelAsk === seat.id) {
-        root.appendChild(h("div", { class: "notice notice-warn v-exams-cancel-ask" },
-          h("div", null, "Cancel your seat at this session? Cancelling before it starts never gives a strike."),
-          h("div", { class: "btn-group mt" },
-            SB.ui.button("Yes, cancel", function () {
-              cancelAsk = null;
-              act(SB.store.cancel(seat.id), "You cancelled this session.");
-            }, { kind: "danger", class: "btn-small" }),
-            SB.ui.button("Keep my seat", function () { cancelAsk = null; SB.router.render(); },
-              { kind: "secondary", class: "btn-small" }))));
-      } else {
-        root.appendChild(h("div", { class: "v-exams-cancel" },
-          SB.ui.button("Cancel my seat", function () { cancelAsk = seat.id; SB.router.render(); }, { kind: "danger", class: "btn-small" })));
-      }
-    }
 
     if (SB.rules.postOpen(state, now, seat.id) && !state.postAnswers.some(function (a) { return a.seatId === seat.id; })) {
       root.appendChild(h("a", { class: "btn btn-primary btn-block v-exams-postlink", href: "#/after/" + session.id },
@@ -320,8 +306,8 @@
     var right = already
       ? h("span", { class: "tag tag-muted" }, "Reported")
       : canReport && !open
-        ? SB.ui.button("Report", function () { reportOpen = m.studentId; reportDraft = ""; SB.router.render(); },
-            { kind: "secondary", class: "btn-small" })
+        ? SB.ui.button("Report a concern", function () { reportOpen = m.studentId; reportDraft = ""; SB.router.render(); },
+            { kind: "secondary", class: "btn-small v-exams-reportbtn" })
         : null;
     var li = h("li", { class: "mate v-exams-mate" },
       h("div", { class: "v-exams-mate-head" },
@@ -335,7 +321,8 @@
       });
       ta.value = reportDraft;
       li.appendChild(h("div", { class: "v-exams-report" },
-        h("p", { class: "small muted" }, "Reports are private. Only the StudyBuddy team sees them."),
+        h("p", { class: "small muted" }, "For safety or conduct concerns, like harassment or feeling unsafe. " +
+          "Not for attendance: you never need to tell us who didn't come. Reports are private; only the StudyBuddy team sees them."),
         ta,
         h("div", { class: "btn-group mt" },
           SB.ui.button("Send report", function () {

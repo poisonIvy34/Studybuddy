@@ -10,7 +10,7 @@
 .v-signin .v-signin-mail {
   width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--info-bg); color: var(--navy); font-size: 30px;
+  background: var(--info-bg); color: var(--brand); font-size: 30px;
 }
 .v-signin .v-signin-addr { overflow-wrap: anywhere; margin-top: 0; }
 .v-signin .v-signin-course .card-sub { margin-bottom: 0; }

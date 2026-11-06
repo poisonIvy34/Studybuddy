@@ -1,5 +1,6 @@
-/* js/views/me.js — #/me: the student's own profile and preference (editable), their own strike
-   warning or pause notice, the exit survey link, joined courses, sign out and delete account.
+/* js/views/me.js — #/me: the student's own profile and preference (editable), their own track
+   record and early-confirm note, the exit survey link, joined classes, sign out and delete account.
+   Also #/classes: the list of every class, where a student adds one without its link (D35).
    Reads state only; every change goes through SB.store. Shows nothing about other students. */
 (function () {
   "use strict";
@@ -34,17 +35,24 @@
     var root = h("div", { class: "v-me" });
     root.appendChild(h("h1", null, "Me"));
 
-    // ---- Own strike status (never shown to anyone else) ----
-    var strikes = SB.rules.activeStrikes(state, me.id);
-    if (SB.rules.isPaused(state, now, me.id)) {
-      root.appendChild(h("div", { class: "notice notice-error v-me-status", role: "status" },
-        h("div", { class: "strong" }, "Sign-ups are paused"),
-        h("div", null, "You missed sessions you had confirmed, so you can't pick times until " +
-          SB.clock.fmt(me.pausedUntil, "full") + ". Picks and sessions in that period were cancelled.")));
-    } else if (strikes >= 2) {
-      root.appendChild(h("div", { class: "notice notice-warn v-me-status", role: "status" },
-        h("div", { class: "strong" }, "You have " + strikes + " strikes"),
-        h("div", null, "A strike comes from confirming a session and not checking in. One more pauses your sign-ups for 14 days.")));
+    // ---- Own reliability (D38: a positive stat, never shown to anyone else) ----
+    var rel = SB.rules.reliability(state, me.id);
+    if (rel.promised) {
+      root.appendChild(h("div", { class: "card v-me-rel" },
+        h("div", { class: "v-me-rel-num" }, rel.shownUp + " of " + rel.promised),
+        h("div", null, h("div", { class: "strong" }, "You've shown up to " + rel.shownUp + " of " + rel.promised +
+          (rel.promised === 1 ? " session" : " sessions") + " you said you'd come to"),
+          h("div", { class: "muted small" }, rel.shownUp === rel.promised ? "Your groups can count on you. Nice!" :
+            "Life happens. Tapping Can't make it lets your group know and never counts against you."))));
+    }
+    // D39: classes where this exam's sessions need an early answer
+    var early = (me.courseIds || []).filter(function (cid) {
+      return SB.rules.recentMisses(state, now, me.id, cid) >= state.settings.earlyConfirmAfterMisses;
+    }).map(function (cid) { var c = (state.courses || []).find(function (x) { return x.id === cid; }); return c ? c.name.split(":")[0] : ""; });
+    if (early.length) {
+      root.appendChild(h("div", { class: "notice notice-info v-me-status", role: "status" },
+        "For " + early.join(" and ") + " this exam, please tap Still coming by " + state.settings.earlyConfirmByHoursBefore +
+        " hours before each session, so your group can count on a full table. This resets when the next exam's study times open."));
     }
 
     // ---- Exit survey ----
@@ -65,8 +73,8 @@
     root.appendChild(h("div", { class: "section-title" }, "Profile"));
     root.appendChild(ui.editing ? profileForm(me) : profileView(me));
 
-    // ---- Courses ----
-    root.appendChild(h("div", { class: "section-title" }, "Your courses"));
+    // ---- Classes ----
+    root.appendChild(h("div", { class: "section-title" }, "Your classes"));
     var courses = (me.courseIds || []).map(function (id) {
       return (state.courses || []).find(function (c) { return c.id === id; });
     }).filter(Boolean);
@@ -77,8 +85,9 @@
               h("span", { class: "strong" }, c.name),
               h("span", { class: "muted small v-me-section" }, "Section " + c.section));
           })
-        : h("p", { class: "muted small" }, "No courses yet. Open your course link to add a course."),
-      h("p", { class: "muted small v-me-note" }, "To add a course, open the link your professor shared.")
+        : h("p", { class: "muted small" }, "No classes yet."),
+      h("div", { class: "card-actions" },
+        h("a", { class: "btn btn-secondary btn-block", href: "#/classes" }, "+ Add a class"))
     ));
 
     // ---- Account ----
@@ -173,5 +182,65 @@
     );
   }
 
+  // ---- #/classes: every class in the pilot, with Add (D35) ----
+  var classUi = { query: "", flash: null, error: null };
+
+  function renderClasses(params, mount) {
+    var h = SB.ui.h;
+    var state = SB.store.get();
+    var me = (state.students || []).find(function (s) { return s.id === state.demo.currentUserId; });
+    if (!me) {
+      mount.appendChild(SB.ui.empty("Sign in as a student to add classes."));
+      return;
+    }
+
+    var q = classUi.query.trim().toLowerCase();
+    var list = (state.courses || [])
+      .filter(function (c) { return !q || (c.name + " " + c.section).toLowerCase().indexOf(q) >= 0; })
+      .slice().sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : (a.section < b.section ? -1 : 1); });
+
+    var search = h("input", {
+      type: "text", value: classUi.query, placeholder: "Search by class name or section",
+      "aria-label": "Search classes",
+      oninput: function (e) {
+        classUi.query = e.target.value;
+        var pos = e.target.selectionStart;
+        redraw();
+        var again = document.querySelector(".v-me-search input");
+        if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (err) { /* ignore */ } }
+      }
+    });
+
+    var root = h("div", { class: "v-me" },
+      h("a", { class: "btn-link v-me-back", href: "#/me" }, "‹ Me"),
+      h("h1", null, "Add a class"),
+      h("p", { class: "muted" }, "Pick your classes to see their exams and study times. You can also open a class link from your professor."),
+      classUi.flash ? h("div", { class: "notice notice-ok", role: "status" }, classUi.flash) : null,
+      classUi.error ? h("div", { class: "notice notice-error", role: "alert" }, classUi.error) : null,
+      h("div", { class: "v-me-search" }, search),
+      list.length
+        ? SB.ui.card(list.map(function (c) {
+            var joined = (me.courseIds || []).indexOf(c.id) >= 0;
+            return h("div", { class: "card-row" },
+              h("div", { class: "grow" },
+                h("div", { class: "strong" }, c.name),
+                h("div", { class: "muted small" }, "Section " + c.section)),
+              joined
+                ? h("span", { class: "tag tag-ok" }, "✓ Added")
+                : SB.ui.button("Add", function () {
+                    var r = SB.store.addCourse(c.id);
+                    classUi.flash = r.ok ? "Added " + c.name + ". Its exams are on the Exams tab." : null;
+                    classUi.error = r.ok ? null : r.error;
+                    redraw();
+                  }, { kind: "primary", class: "btn-small" }));
+          }))
+        : SB.ui.empty("No classes match “" + classUi.query.trim() + "”."),
+      h("a", { class: "btn btn-secondary btn-block mt", href: "#/exams" }, "Go to Exams"));
+
+    classUi.flash = null; classUi.error = null; // show once
+    mount.appendChild(root);
+  }
+
   SB.router.register("/me", render);
+  SB.router.register("/classes", renderClasses);
 })();

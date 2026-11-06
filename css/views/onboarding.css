@@ -16,14 +16,14 @@
   content: ""; display: block; width: 100%; height: 3px; border-radius: 2px; background: var(--line);
 }
 .v-onboarding .v-onboarding-step.done::before,
-.v-onboarding .v-onboarding-step.current::before { background: var(--navy); }
+.v-onboarding .v-onboarding-step.current::before { background: var(--brand); }
 .v-onboarding .v-onboarding-dot {
   width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 12px; border: 1px solid var(--line); background: var(--surface);
 }
 .v-onboarding .v-onboarding-step.done .v-onboarding-dot { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
-.v-onboarding .v-onboarding-step.current { color: var(--navy); font-weight: 600; }
-.v-onboarding .v-onboarding-step.current .v-onboarding-dot { background: var(--navy); color: #fff; border-color: var(--navy); }
+.v-onboarding .v-onboarding-step.current { color: var(--brand); font-weight: 600; }
+.v-onboarding .v-onboarding-step.current .v-onboarding-dot { background: var(--brand); color: #fff; border-color: var(--brand); }
 .v-onboarding .v-onboarding-step-label { overflow-wrap: anywhere; line-height: 1.2; }
 
 .v-onboarding .v-onboarding-choice-sub { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }

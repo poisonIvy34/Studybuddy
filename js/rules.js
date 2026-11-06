@@ -64,52 +64,67 @@
   function hasValidCheckin(st, seatId) {
     return st.checkins.some(function (c) { return c.seatId === seatId && isValidCheckin(c); });
   }
-
-  // ---------- strikes ----------
-  function activeStrikes(state, studentId) {
-    return state.strikes.filter(function (k) { return k.studentId === studentId && !k.removed; }).length;
+  // D36: a tablemate named this seat's student in "Who did you study with?"
+  function isAcknowledged(st, seat) {
+    return st.postAnswers.some(function (a) {
+      if ((a.studiedWith || []).indexOf(seat.studentId) < 0) return false;
+      var by = find(st.seats, a.seatId);
+      return !!(by && by.sessionId === seat.sessionId);
+    });
   }
-  function isPaused(state, now, studentId) {
-    var s = student(state, studentId);
-    return !!(s && s.pausedUntil && ms(now) < ms(s.pausedUntil));
+  // D36: attending = a valid check-in or being named by a tablemate
+  function hasAttendance(st, seat) { return hasValidCheckin(st, seat.id) || isAcknowledged(st, seat); }
+
+  // ---------- misses (D36–D39) ----------
+  // D37: a miss stops counting when the next exam in the same class opens its study window
+  // (that exam's time minus slotWindowDays).
+  function missResetMs(st, miss) {
+    var exam = find(st.exams, miss.examId); if (!exam) return -Infinity;
+    var next = Infinity;
+    st.exams.forEach(function (e) {
+      if (e.courseId !== exam.courseId || ms(e.at) <= ms(exam.at)) return;
+      next = Math.min(next, ms(e.at) - st.settings.slotWindowDays * 86400000);
+    });
+    return next;
+  }
+  function isRecentMiss(state, now, missId) {
+    var k = find(state.misses, missId);
+    return !!(k && !k.removed && ms(now) < missResetMs(state, k));
+  }
+  function recentMisses(state, now, studentId, courseId) {
+    return state.misses.filter(function (k) {
+      if (k.studentId !== studentId) return false;
+      var exam = find(state.exams, k.examId);
+      return !!(exam && exam.courseId === courseId && isRecentMiss(state, now, k.id));
+    }).length;
+  }
+  // D38: the student's own track record, counting only promises to a group (confirmed seats).
+  function reliability(state, studentId) {
+    var shownUp = 0, promised = 0;
+    state.seats.forEach(function (seat) {
+      if (seat.studentId !== studentId) return;
+      if (seat.status === "attended") { shownUp++; promised++; }
+      if (seat.status === "no_show" &&
+          !state.misses.some(function (k) { return k.seatId === seat.id && k.removed; })) promised++;
+    });
+    return { shownUp: shownUp, promised: promised };
   }
 
-  // Mutates st (a copy). Gives a strike at `at` and applies the warning / pause rules.
-  function giveStrike(st, studentId, seatId, at) {
-    st.strikes.push({ id: nextId(st, "stk_"), studentId: studentId, seatId: seatId, at: at, removed: false });
-    var n = activeStrikes(st, studentId);
-    if (n === st.settings.strikeWarnAt) {
-      notify(st, at, { to: studentId, kind: "strike_warning", route: "#/me",
-        text: "You now have " + n + " strikes for missed sessions. A " + st.settings.strikePauseAt +
-          "rd strike pauses sign-ups for " + st.settings.strikePauseDays + " days." });
+  // Mutates st (a copy). Records a miss at `at` and sends the private, gentle notice (D38).
+  function giveMiss(st, seat, at) {
+    var slot = slotOfSession(st, find(st.sessions, seat.sessionId));
+    var exam = examOfSlot(st, slot), course = courseOfSlot(st, slot);
+    st.misses.push({ id: nextId(st, "mis_"), studentId: seat.studentId, seatId: seat.id, examId: exam ? exam.id : null,
+      at: at, removed: false });
+    var cls = course ? course.name.split(":")[0] : "class";
+    var n = course ? recentMisses(st, at, seat.studentId, course.id) : 0;
+    var text = "Looks like you missed your " + cls + " session. Life happens! Next time, tapping “Can't make it” lets your group know.";
+    if (n >= st.settings.earlyConfirmAfterMisses) {
+      text = "Looks like you missed another " + cls + " session. For your next " + cls + " sessions this exam, please confirm by " +
+        st.settings.earlyConfirmByHoursBefore + " hours before the start, so your group can count on a full table. " +
+        "This resets when your next " + cls + " exam's study times open.";
     }
-    if (n >= st.settings.strikePauseAt) applyPause(st, studentId, at);
-  }
-
-  function applyPause(st, studentId, at) {
-    var s = student(st, studentId); if (!s) return;
-    var until = SB.clock.add(at, { days: st.settings.strikePauseDays });
-    if (s.pausedUntil && ms(s.pausedUntil) > ms(until)) until = s.pausedUntil;
-    s.pausedUntil = until;
-    var atMs = ms(at), untilMs = ms(until);
-    st.picks.forEach(function (p) {
-      if (p.studentId !== studentId || p.status !== "active") return;
-      var slot = find(st.slots, p.slotId);
-      if (slot && ms(slot.start) < untilMs) { p.status = "removed"; p.removedReason = "strike_pause"; }
-    });
-    st.seats.forEach(function (seat) {
-      if (seat.studentId !== studentId || (seat.status !== "placed" && seat.status !== "confirmed")) return;
-      var slot = slotOfSession(st, find(st.sessions, seat.sessionId));
-      if (!slot) return;
-      var startMs = ms(slot.start);
-      // D8: sessions whose start falls in the 14 days (a session already under way is left alone)
-      if (startMs >= atMs && startMs < untilMs) {
-        seat.status = "cancelled"; seat.cancelledAt = at; seat.cancelReason = "strike_pause";
-      }
-    });
-    notify(st, at, { to: studentId, kind: "strike_pause", route: "#/me",
-      text: "You have " + activeStrikes(st, studentId) + " strikes, so sign-ups are paused until " +
-        SB.clock.fmt(until, "full") + ". Your picks and sessions before then were cancelled." });
+    notify(st, at, { to: seat.studentId, kind: "miss_notice", route: "#/me", text: text });
   }
 
   // ---------- drop suggestion (D4, D21) ----------
@@ -129,7 +144,7 @@
   }
 
   // ---------- timeline jobs ----------
-  var ORDER = { end: 0, start: 1, confirm: 2, lowTurnout: 3, lock: 4, pilotEnd: 5 };
+  var ORDER = { final: 0, end: 1, start: 2, confirm: 3, earlyRelease: 4, lowTurnout: 5, earlyAsk: 6, lock: 7, pilotEnd: 8 };
 
   function dueJobs(st, toMs) {
     var jobs = [];
@@ -143,10 +158,13 @@
       var slot = find(st.slots, ses.slotId); if (!slot) return;
       var T = ms(slot.start), E = ms(slot.end), s = st.settings;
       var list = [
+        ["earlyAsk", T - s.earlyConfirmAskHoursBefore * 3600000, "earlyAskSent"],
         ["lowTurnout", T - s.lowTurnoutHoursBefore * 3600000, "lowTurnoutSent"],
+        ["earlyRelease", T - s.earlyConfirmByHoursBefore * 3600000, "earlyReleaseDone"],
         ["confirm", T - s.confirmMinutesBefore * 60000, "confirmSent"],
         ["start", T, "startDone"],
-        ["end", E, "endDone"]
+        ["end", E, "endDone"],
+        ["final", E + s.postWindowHours * 3600000, "finalDone"]
       ];
       list.forEach(function (j) {
         if (!ses.jobs[j[2]] && j[1] <= toMs) jobs.push({ type: j[0], t: j[1], slot: slot, session: ses, id: ses.id });
@@ -183,23 +201,30 @@
         var spot = slot.spots[t - 1];
         if (!spot) { spot = "To be announced"; missing++; }
         var ses = { id: nextId(st, "ses_"), slotId: slot.id, table: t, spot: spot,
-          jobs: { lowTurnoutSent: false, confirmSent: false, startDone: false, endDone: false } };
+          jobs: { earlyAskSent: false, lowTurnoutSent: false, earlyReleaseDone: false, confirmSent: false,
+            startDone: false, endDone: false, finalDone: false } };
         st.sessions.push(ses);
         var members = picks.slice(idx, idx + size); idx += size;
+        var courseId = courseIdOfSlotId(st, slot.id);
         members.forEach(function (p) {
           p.status = "placed";
           st.seats.push({ id: nextId(st, "set_"), sessionId: ses.id, studentId: p.studentId, status: "placed",
-            confirmedAt: null, cancelledAt: null, cancelReason: null });
+            confirmedAt: null, cancelledAt: null, cancelReason: null,
+            earlyConfirm: recentMisses(st, at, p.studentId, courseId) >= s.earlyConfirmAfterMisses }); // D39, fixed at lock
         });
         tables.push({ ses: ses, ids: members.map(function (p) { return p.studentId; }) });
       }
       tables.forEach(function (tb) {
         tb.ids.forEach(function (sid) {
           var mates = firstNames(st, tb.ids.filter(function (x) { return x !== sid; }));
+          var mine = st.seats.filter(function (x) { return x.sessionId === tb.ses.id && x.studentId === sid; })[0];
+          var early = mine && mine.earlyConfirm
+            ? " Please tap Still coming by " + SB.clock.fmt(SB.clock.add(slot.start, { hours: -s.earlyConfirmByHoursBefore }), "dayTime") +
+              " to keep your seat." : "";
           notify(st, at, { to: sid, kind: "session_confirmed", route: "#/session/" + tb.ses.id,
             slotId: slot.id, sessionId: tb.ses.id,
             text: "Session confirmed: " + when + " at " + slot.place + ", " + tb.ses.spot + " (table " + tb.ses.table +
-              "). Your table: " + (mates.length ? mates.join(", ") : "just you so far") + "." });
+              "). Your table: " + (mates.length ? mates.join(", ") : "just you so far") + "." + early });
         });
       });
       if (missing) {
@@ -225,6 +250,8 @@
     }
   }
 
+  var POST_TEXT = "How did it go? Tell us who you studied with and whether the session left you more prepared.";
+
   function sessionSeats(st, sesId) { return st.seats.filter(function (x) { return x.sessionId === sesId; }); }
 
   function runJob(st, job) {
@@ -232,6 +259,20 @@
     var ses = job.session, slot = job.slot;
     switch (job.type) {
       case "lock": runLock(st, slot, at); break;
+      case "earlyAsk": // D39: seats that must confirm early are asked a day ahead
+        ses.jobs.earlyAskSent = true;
+        sessionSeats(st, ses.id).forEach(function (x) {
+          if (x.status !== "placed" || !x.earlyConfirm) return;
+          notify(st, at, { to: x.studentId, kind: "still_coming", route: "#/session/" + ses.id, slotId: slot.id,
+            sessionId: ses.id,
+            text: "Still coming? Your group is counting on you for " + SB.clock.fmt(slot.start, "dayTime") + " at " + slot.place +
+              ". Please answer by " + SB.clock.fmt(SB.clock.add(slot.start, { hours: -st.settings.earlyConfirmByHoursBefore }), "time") + "." });
+        });
+        break;
+      case "earlyRelease": // D39: no answer by the early deadline frees the seat, with no miss
+        ses.jobs.earlyReleaseDone = true;
+        sessionSeats(st, ses.id).forEach(function (x) { if (x.status === "placed" && x.earlyConfirm) x.status = "released"; });
+        break;
       case "lowTurnout":
         ses.jobs.lowTurnoutSent = true;
         var still = sessionSeats(st, ses.id).filter(function (x) { return x.status === "placed" || x.status === "confirmed"; });
@@ -260,15 +301,18 @@
       case "end":
         ses.jobs.endDone = true;
         sessionSeats(st, ses.id).forEach(function (x) {
-          if (x.status === "confirmed" && !hasValidCheckin(st, x.id)) {
-            x.status = "no_show";
-            giveStrike(st, x.studentId, x.id, at);
-          }
-        });
-        sessionSeats(st, ses.id).forEach(function (x) {
           if (x.status !== "attended") return;
           notify(st, at, { to: x.studentId, kind: "post_session", route: "#/after/" + ses.id, slotId: slot.id,
-            sessionId: ses.id, text: "How did it go? Tell us whether today's session left you more prepared." });
+            sessionId: ses.id, text: POST_TEXT });
+        });
+        break;
+      case "final": // D36: after the 24h window, a confirmed seat nobody saw is a miss
+        ses.jobs.finalDone = true;
+        sessionSeats(st, ses.id).forEach(function (x) {
+          if (x.status === "confirmed" && !hasAttendance(st, x)) {
+            x.status = "no_show";
+            giveMiss(st, x, at);
+          }
         });
         break;
       case "pilotEnd":
@@ -308,7 +352,6 @@
     if (slot.status !== "open" || slot.jobs.lockDone || ms(now) >= lockMs(state, slot)) return false;
     var c = courseOfSlot(state, slot);
     if (!c || s.courseIds.indexOf(c.id) < 0) return false;
-    if (isPaused(state, now, studentId)) return false;
     return !activePicks(state, slotId).some(function (p) { return p.studentId === studentId; });
   }
 
@@ -317,7 +360,10 @@
     var cx = seatContext(state, seatId); if (!cx) return r;
     var n = ms(now), T = ms(cx.slot.start), E = ms(cx.slot.end), s = state.settings, st = cx.seat.status;
     var live = st === "placed" || st === "confirmed";
-    r.canConfirm = r.canCantMakeIt = st === "placed" && n >= T - s.confirmMinutesBefore * 60000 && n < T;
+    // D19; D39: an early-confirm seat answers from lock until T − earlyConfirmByHoursBefore
+    r.canConfirm = r.canCantMakeIt = st === "placed" && (cx.seat.earlyConfirm
+      ? n < T - s.earlyConfirmByHoursBefore * 3600000
+      : n >= T - s.confirmMinutesBefore * 60000 && n < T);
     r.canCancel = live && n < T;
     r.canCheckIn = live && n >= T - s.checkInOpensMinutesBefore * 60000 && n < E;
     r.canReport = n < E + s.postWindowHours * 3600000 &&
@@ -349,19 +395,19 @@
     var w = [];
     var exam = slot && find(state.exams, slot.examId);
     if (!exam || !validIso(slot.start) || !validIso(slot.end)) return w;
-    var from = ms(SB.clock.add(exam.at, { days: -5 })), examMs = ms(exam.at);
+    var days = state.settings.slotWindowDays;
+    var from = ms(SB.clock.add(exam.at, { days: -days })), examMs = ms(exam.at);
     if (ms(slot.start) < from || ms(slot.end) > examMs) {
-      w.push("This slot isn't in the 5 days before the exam (" + SB.clock.fmt(exam.at, "dayTime") + ").");
+      w.push("This slot isn't in the " + days + " days before the exam (" + SB.clock.fmt(exam.at, "dayTime") + ").");
     }
     return w;
   }
 
   function examsFor(state, now, studentId) {
     var s = student(state, studentId);
-    var out = { sessions: [], exams: [], noCourses: true, pausedUntil: null };
+    var out = { sessions: [], exams: [], noCourses: true };
     if (!s) return out;
     out.noCourses = s.courseIds.length === 0;
-    out.pausedUntil = isPaused(state, now, studentId) ? s.pausedUntil : null;
     var n = ms(now);
     state.seats.forEach(function (seat) {
       if (seat.studentId !== studentId) return;
@@ -428,7 +474,7 @@
       var cancelledBeforeStart = seat.status === "cancelled" && seat.cancelledAt && ms(seat.cancelledAt) < T;
       if (seat.confirmedAt && !cancelledBeforeStart && T <= nowMs) {
         suConf++;
-        if (hasValidCheckin(st, seat.id)) suValid++;
+        if (hasAttendance(st, seat)) suValid++; // D36
       }
     });
 
@@ -529,7 +575,7 @@
     var s = st.students.filter(function (x) { return normEmail(x.email) === e; })[0];
     if (!s) {
       s = { id: nextId(st, "stu_"), email: e, firstName: null, year: null, vibe: null, courseIds: [],
-        onboarding: { profile: false, conduct: false, intake: false, permissions: false }, pausedUntil: null };
+        onboarding: { profile: false, conduct: false, intake: false, permissions: false } };
       st.students.push(s);
     }
     if (st.demo.pendingLinkCode) { addCourseToStudent(st, s, st.demo.pendingLinkCode); st.demo.pendingLinkCode = null; }
@@ -545,6 +591,16 @@
     var s = student(st, userId); if (!s) return fail(st, "Sign in as a student first.");
     addCourseToStudent(st, s, linkCode);
     st.demo.pendingLinkCode = null;
+    return ok(st);
+  }
+  // D35: a signed-in student can add any course from the list, without its link.
+  function addCourse(state, now, userId, courseId) {
+    var st = copy(state), err = needStudent(st, userId); if (err) return fail(st, err);
+    var c = st.courses.filter(function (x) { return x.id === courseId; })[0];
+    if (!c) return fail(st, "That class isn't in the list.");
+    var s = student(st, userId);
+    if (s.courseIds.indexOf(c.id) >= 0) return fail(st, "You already added this class.");
+    addCourseToStudent(st, s, c.linkCode);
     return ok(st);
   }
   function signOut(state, now, userId) {
@@ -611,7 +667,6 @@
     if (!canPick(st, now, userId, slotId)) {
       var slot = find(st.slots, slotId);
       if (!slot) return fail(st, "That slot doesn't exist.");
-      if (isPaused(st, now, userId)) return fail(st, "Sign-ups are paused until " + SB.clock.fmt(student(st, userId).pausedUntil, "full") + ".");
       if (slot.status !== "open" || ms(now) >= lockMs(st, slot)) return fail(st, "Picking for this slot has closed.");
       return fail(st, "You can't pick this slot.");
     }
@@ -641,14 +696,27 @@
       seat.status = "confirmed"; seat.confirmedAt = now;
     });
   }
+  // D40: backing out tells the rest of the table (first name only), never with blame.
+  function tellGroup(st, seat, now) {
+    var ses = find(st.sessions, seat.sessionId), slot = slotOfSession(st, ses);
+    var name = firstNames(st, [seat.studentId])[0];
+    sessionSeats(st, seat.sessionId).forEach(function (x) {
+      if (x.id === seat.id || (x.status !== "placed" && x.status !== "confirmed")) return;
+      notify(st, now, { to: x.studentId, kind: "mate_cancelled", route: "#/session/" + ses.id, slotId: slot.id,
+        sessionId: ses.id,
+        text: name + " can't make it to your " + SB.clock.fmt(slot.start, "dayTime") + " session. The rest of your table is still on!" });
+    });
+  }
   function cantMakeIt(state, now, userId, seatId) {
     return seatOp(state, now, userId, seatId, "canCantMakeIt", function (st, seat) {
       seat.status = "cancelled"; seat.cancelledAt = now; seat.cancelReason = "cant_make_it";
+      tellGroup(st, seat, now);
     });
   }
   function cancel(state, now, userId, seatId) {
     return seatOp(state, now, userId, seatId, "canCancel", function (st, seat) {
       seat.status = "cancelled"; seat.cancelledAt = now; seat.cancelReason = "student";
+      tellGroup(st, seat, now);
     });
   }
   function checkIn(state, now, userId, seatId) {
@@ -674,13 +742,32 @@
       text: typeof text === "string" ? text : "", at: now, adminDecision: null });
     return ok(st);
   }
-  function answerPost(state, now, userId, seatId, answer) {
+  // D36: studiedWith names tablemates (student IDs). Each named student whose seat is still
+  // `confirmed` (no check-in yet) becomes `attended` and gets the post-session question too.
+  function answerPost(state, now, userId, seatId, answer, studiedWith) {
     var st = copy(state), err = needStudent(st, userId); if (err) return fail(st, err);
-    if (!ownSeat(st, userId, seatId)) return fail(st, "That isn't your session.");
+    var mine = ownSeat(st, userId, seatId); if (!mine) return fail(st, "That isn't your session.");
     if (["more", "same", "less"].indexOf(answer) < 0) return fail(st, "Pick one answer.");
     if (!postOpen(st, now, seatId)) return fail(st, "This question isn't open.");
     if (st.postAnswers.some(function (a) { return a.seatId === seatId; })) return fail(st, "You already answered.");
-    st.postAnswers.push({ seatId: seatId, answer: answer, at: now });
+    var names = studiedWith || [];
+    if (!Array.isArray(names)) return fail(st, "Pick tablemates from your table.");
+    var seatsFor = {};
+    sessionSeats(st, mine.sessionId).forEach(function (x) { if (x.studentId !== userId) seatsFor[x.studentId] = x; });
+    var clean = [];
+    for (var i = 0; i < names.length; i++) {
+      if (!seatsFor[names[i]]) return fail(st, "You can only name people at your table.");
+      if (clean.indexOf(names[i]) < 0) clean.push(names[i]);
+    }
+    st.postAnswers.push({ seatId: seatId, answer: answer, studiedWith: clean, at: now });
+    var ses = find(st.sessions, mine.sessionId), slot = slotOfSession(st, ses);
+    clean.forEach(function (sid) {
+      var x = seatsFor[sid];
+      if (x.status !== "confirmed") return;
+      x.status = "attended";
+      notify(st, now, { to: x.studentId, kind: "post_session", route: "#/after/" + ses.id, slotId: slot.id,
+        sessionId: ses.id, text: POST_TEXT });
+    });
     return ok(st);
   }
   function submitExit(state, now, userId, answers, nps) {
@@ -705,9 +792,12 @@
     st.students = st.students.filter(function (s) { return s.id !== userId; });
     st.picks = st.picks.filter(function (p) { return p.studentId !== userId; });
     st.seats = st.seats.filter(function (x) { return !seatIds[x.id]; });
-    st.strikes = st.strikes.filter(function (k) { return k.studentId !== userId && !seatIds[k.seatId]; });
+    st.misses = st.misses.filter(function (k) { return k.studentId !== userId && !seatIds[k.seatId]; });
     st.checkins = st.checkins.filter(function (c) { return !seatIds[c.seatId]; });
     st.postAnswers = st.postAnswers.filter(function (a) { return !seatIds[a.seatId]; });
+    st.postAnswers.forEach(function (a) {
+      if (a.studiedWith) a.studiedWith = a.studiedWith.filter(function (id) { return id !== userId; });
+    });
     st.reports = st.reports.filter(function (r) { return r.byStudentId !== userId && r.aboutStudentId !== userId; });
     st.surveyAnswers = st.surveyAnswers.filter(function (a) { return a.studentId !== userId; });
     st.notifications = st.notifications.filter(function (n) { return n.to !== userId; });
@@ -790,9 +880,9 @@
     c.adminDecision = decision;
     if (decision === "rejected") {
       var seat = find(st.seats, c.seatId);
-      if (seat && !hasValidCheckin(st, seat.id)) {
+      if (seat && !hasAttendance(st, seat)) { // a tablemate's "studied with" still counts (D36)
         seat.status = "no_show";
-        giveStrike(st, seat.studentId, seat.id, now); // D11, D23
+        giveMiss(st, seat, now); // D11
       }
     }
     return ok(st);
@@ -805,13 +895,11 @@
     r.adminDecision = decision; // Still open #11: recording only
     return ok(st);
   }
-  function removeStrike(state, now, userId, strikeId) {
+  function removeMiss(state, now, userId, missId) {
     var st = copy(state), err = needAdmin(st, userId); if (err) return fail(st, err);
-    var k = find(st.strikes, strikeId); if (!k) return fail(st, "No such strike.");
-    if (k.removed) return fail(st, "This strike was already removed.");
-    k.removed = true;
-    var s = student(st, k.studentId);
-    if (s && s.pausedUntil && activeStrikes(st, s.id) < st.settings.strikePauseAt) s.pausedUntil = null; // D22
+    var k = find(st.misses, missId); if (!k) return fail(st, "No such miss.");
+    if (k.removed) return fail(st, "This miss was already removed.");
+    k.removed = true; // seats already set to confirm early stay that way (D39)
     return ok(st);
   }
 
@@ -820,20 +908,20 @@
     tick: tick, nextId: nextId,
     // transitions
     setLocation: setLocation, switchUser: switchUser, setPendingLink: setPendingLink,
-    requestLink: requestLink, openLink: openLink, joinCourse: joinCourse, signOut: signOut,
+    requestLink: requestLink, openLink: openLink, joinCourse: joinCourse, addCourse: addCourse, signOut: signOut,
     saveProfile: saveProfile, acceptConduct: acceptConduct, submitIntake: submitIntake, finishPermissions: finishPermissions,
     pick: pick, unpick: unpick, confirm: confirm, cantMakeIt: cantMakeIt, cancel: cancel, checkIn: checkIn,
     report: report, answerPost: answerPost, submitExit: submitExit, deleteAccount: deleteAccount,
     markRead: markRead,
     saveCourse: saveCourse, saveExam: saveExam, saveSlot: saveSlot, setPilotEnd: setPilotEnd,
-    decideCheckin: decideCheckin, decideReport: decideReport, removeStrike: removeStrike,
+    decideCheckin: decideCheckin, decideReport: decideReport, removeMiss: removeMiss,
     // reads
     examsFor: function (state, now, studentId) { return examsFor(copy(state), now, studentId); },
     slotCount: slotCount,
     canPick: canPick,
     seatActions: seatActions,
     tablemates: function (state, now, seatId) { return tablemates(copy(state), now, seatId); },
-    activeStrikes: activeStrikes, isPaused: isPaused,
+    recentMisses: recentMisses, isRecentMiss: isRecentMiss, reliability: reliability,
     postOpen: postOpen, surveyOpen: surveyOpen,
     slotWarnings: slotWarnings,
     metrics: metrics

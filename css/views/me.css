@@ -7,3 +7,11 @@
 .v-me .v-me-delete p { margin: 6px 0 10px; }
 .v-me .v-me-delete .btn-group .btn { flex: 1 1 auto; }
 .v-me .v-me-section { white-space: nowrap; }
+.v-me .v-me-back { display: inline-block; margin: 0 0 8px -4px; font-size: 14px; }
+.v-me .v-me-search { margin: 4px 0 14px; }
+.v-me .v-me-search input { background: var(--surface); }
+.v-me .v-me-rel { display: flex; align-items: center; gap: 16px; }
+.v-me .v-me-rel-num {
+  flex: 0 0 auto; min-width: 72px; padding: 10px 12px; border-radius: 14px; text-align: center;
+  background: var(--brand-soft); color: var(--brand-ink); font-size: 20px; font-weight: 750; white-space: nowrap;
+}

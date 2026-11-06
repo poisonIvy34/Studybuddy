@@ -2,7 +2,7 @@
  *
  * SB.demo.render() draws a collapsible drawer into #demo with:
  *  - Clock: fake "now" in MT; +15m / +1h / +1 day; a slot chooser with "Jump to"
- *    Lock (T−48h) / T−3h / T−30m / T−15m / T / End / End+24h. Past targets are disabled.
+ *    Lock (T−48h) / T−24h / T−3h / T−30m / T−15m / T / End / End+24h. Past targets are disabled.
  *    Every clock change goes through SB.store.advance(newNow).
  *  - Location: In range / Out of range / Denied → SB.store.setLocation(v).
  *  - User: signed out, any admin, any student → SB.store.switchUser(id | null).
@@ -44,6 +44,7 @@
     var postH = s.postWindowHours != null ? s.postWindowHours : 24;
     return [
       { label: "Lock (T−" + lockH + "h)", at: start - lockH * H },
+      { label: "T−" + s.earlyConfirmAskHoursBefore + "h", at: start - s.earlyConfirmAskHoursBefore * H },
       { label: "T−" + lowH + "h", at: start - lowH * H },
       { label: "T−" + confM + "m", at: start - confM * M },
       { label: "T−" + inM + "m", at: start - inM * M },
@@ -147,7 +148,7 @@
       h(
         "div",
         null,
-        h("div", { class: "demo-now" }, SB.clock.fmt(now, "full"), h("span", { class: "muted small" }, " MT")),
+        h("div", { class: "demo-now" }, SB.clock.fmt(now, "full")),
         h(
           "div",
           { class: "demo-btns" },

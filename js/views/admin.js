@@ -4,11 +4,11 @@
  *   #/admin/courses   courses, exams, slots (create / edit before lock), pilot end date, Admin inbox
  *   #/admin/slot/:id  one slot: picks, lock result, tables, seats, confirmations, check-ins
  *   #/admin/review    unverified check-ins and reports, Accept / Reject
- *   #/admin/strikes   strikes per student, Remove
+ *   #/admin/misses    misses per student (recent per class, D37), Remove
  *   #/admin/metrics   pilot metrics (overall + per course, D25), no-show rate, NPS
  *
  * Reads state with SB.store.get() (deep-frozen: copy arrays before sorting) and changes it only
- * through SB.store actions. No business rules live here: locks, strikes and metrics come from SB.rules.
+ * through SB.store actions. No business rules live here: locks, misses and metrics come from SB.rules.
  * Out of scope here: deleting locked slots and cancelling sessions (Still open #10), CSV export (D10).
  */
 (function () {
@@ -394,8 +394,11 @@
             h("div", { class: "small muted v-admin-email" }, s ? s.email : "—"),
             seat.cancelReason ? h("div", { class: "small muted" }, "Cancelled (" + seat.cancelReason.replace(/_/g, " ") + ")" +
               (seat.cancelledAt ? " · " + fmt(seat.cancelledAt) : "")) : null,
-            h("div", { class: "small" }, h("span", { class: "muted" }, "Confirmed: "),
-              seat.confirmedAt ? fmt(seat.confirmedAt) : "not confirmed"),
+            h("div", { class: "small" }, h("span", { class: "muted" }, "Still coming: "),
+              seat.confirmedAt ? fmt(seat.confirmedAt) : "not yet",
+              seat.earlyConfirm ? h("span", { class: "tag tag-warn v-admin-gap" }, "must confirm early") : null),
+            namedBy(state, seat).length ? h("div", { class: "small" }, h("span", { class: "muted" }, "Named by: "),
+              namedBy(state, seat).join(", ")) : null,
             h("div", { class: "small row row-wrap" }, h("span", { class: "muted" }, "Check-in:"),
               checks.length ? checks.map(function (c) {
                 return h("span", { class: "v-admin-check" }, checkinTag(c), h("span", { class: "muted" }, " " + fmt(c.at, "time")));
@@ -420,6 +423,14 @@
     }), "No one has picked this slot."));
   }
 
+  // First names of tablemates who said they studied with this seat's student (D36).
+  function namedBy(state, seat) {
+    return state.postAnswers.filter(function (a) {
+      var by = byId(state.seats, a.seatId);
+      return by && by.sessionId === seat.sessionId && (a.studiedWith || []).indexOf(seat.studentId) >= 0;
+    }).map(function (a) { return personName(byId(state.students, byId(state.seats, a.seatId).studentId)); });
+  }
+
   // ---------- #/admin/review ----------
   function seatInfo(state, seatId) {
     var seat = byId(state.seats, seatId);
@@ -433,7 +444,7 @@
 
   function renderReview(params, mountEl) {
     var state = st();
-    var el = root(mountEl, "Review", "Unverified check-ins count as attended unless you reject them. A rejection makes the seat a no-show with a strike (D11).");
+    var el = root(mountEl, "Review", "Unverified check-ins count as attended unless you reject them. A rejection makes the seat a no-show with a miss (D11), unless a tablemate named them (D36).");
     var msg = msgBox();
     el.appendChild(msg);
 
@@ -451,7 +462,7 @@
         h("p", { class: "small" }, "Tapped I'm here at " + fmt(c.at) + ". Location was denied or failed."),
         h("div", { class: "card-actions" },
           SB.ui.button("Accept", function () { act(msg, function () { return SB.store.decideCheckin(c.id, "accepted"); }); }),
-          SB.ui.button("Reject (no-show + strike)", function () { act(msg, function () { return SB.store.decideCheckin(c.id, "rejected"); }); }, { kind: "danger" }),
+          SB.ui.button("Reject (no-show + miss)", function () { act(msg, function () { return SB.store.decideCheckin(c.id, "rejected"); }); }, { kind: "danger" }),
           x.slot ? h("a", { class: "btn btn-secondary", href: "#/admin/slot/" + encodeURIComponent(x.slot.id) }, "View slot") : null)));
     });
 
@@ -491,38 +502,51 @@
     }
   }
 
-  // ---------- #/admin/strikes ----------
-  function renderStrikes(params, mountEl) {
+  // ---------- #/admin/misses ----------
+  function renderMisses(params, mountEl) {
     var state = st();
     var s = state.settings;
-    var el = root(mountEl, "Strikes",
-      "Strike " + s.strikeWarnAt + " sends a warning. Strike " + s.strikePauseAt + " pauses sign-ups for " + s.strikePauseDays +
-      " days. Removing a strike that brings a student below " + s.strikePauseAt + " lifts the pause (D22).");
+    var el = root(mountEl, "Misses",
+      "A miss is a seat the student said Still coming for, where nobody saw them: no check-in and no tablemate named them " +
+      "within " + s.postWindowHours + "h of the end. Misses count per class and reset when the next exam's study times open (D37). " +
+      s.earlyConfirmAfterMisses + " recent misses in a class means confirming by " + s.earlyConfirmByHoursBefore +
+      "h before that class's next sessions (D39). There is no pause.");
     var msg = msgBox();
     el.appendChild(msg);
     var byStudent = {};
-    (state.strikes || []).forEach(function (k) { (byStudent[k.studentId] = byStudent[k.studentId] || []).push(k); });
+    (state.misses || []).forEach(function (k) { (byStudent[k.studentId] = byStudent[k.studentId] || []).push(k); });
     var ids = Object.keys(byStudent);
-    if (!ids.length) { el.appendChild(SB.ui.empty("No strikes.")); return; }
+    if (!ids.length) { el.appendChild(SB.ui.empty("No misses.")); return; }
     var now = SB.clock.now();
+    function recentTotal(id) {
+      var stu = byId(state.students, id);
+      return (stu ? stu.courseIds : []).reduce(function (n, cid) { return n + SB.rules.recentMisses(state, now, id, cid); }, 0);
+    }
     ids.sort(function (a, b) {
-      var d = SB.rules.activeStrikes(state, b) - SB.rules.activeStrikes(state, a);
+      var d = recentTotal(b) - recentTotal(a);
       if (d) return d;
       var na = personName(byId(state.students, a)), nb = personName(byId(state.students, b));
       return na < nb ? -1 : na > nb ? 1 : 0;
     });
     ids.forEach(function (id) {
       var stu = byId(state.students, id);
-      var active = SB.rules.activeStrikes(state, id);
-      var paused = SB.rules.isPaused(state, now, id);
+      var rel = SB.rules.reliability(state, id);
+      var tags = (stu ? stu.courseIds : []).map(function (cid) {
+        var n = SB.rules.recentMisses(state, now, id, cid), c = byId(state.courses, cid);
+        if (!n) return null;
+        return h("span", { class: ["tag", n >= s.earlyConfirmAfterMisses ? "tag-warn" : "tag-muted"] },
+          (c ? c.name.split(":")[0] : cid) + ": " + n + " recent" + (n >= s.earlyConfirmAfterMisses ? " · confirms early" : ""));
+      });
       var list = sorted(byStudent[id], function (k) { return ms(k.at); });
       var rows = list.map(function (k) {
         var x = seatInfo(state, k.seatId);
         return h("tr", { class: k.removed ? "muted" : null },
           h("td", null, h("div", { class: "strong small" }, "Given " + fmt(k.at)), h("div", { class: "small" }, slotLabel(state, x.slot)), x.seat ? h("div", { class: "small muted" }, "Seat: " + x.seat.status.replace("_", "-")) : null),
-          h("td", null, k.removed ? h("span", { class: "tag tag-muted" }, "removed") : h("span", { class: "tag tag-bad" }, "active")),
+          h("td", null, k.removed ? h("span", { class: "tag tag-muted" }, "removed")
+            : SB.rules.isRecentMiss(state, now, k.id) ? h("span", { class: "tag tag-warn" }, "counts this exam")
+            : h("span", { class: "tag tag-muted" }, "reset")),
           h("td", null, k.removed ? null : SB.ui.button("Remove", function () {
-            act(msg, function () { return SB.store.removeStrike(k.id); });
+            act(msg, function () { return SB.store.removeMiss(k.id); });
           }, { kind: "danger", class: "btn-small" })));
       });
       el.appendChild(SB.ui.card(
@@ -530,10 +554,9 @@
           h("div", null, h("div", { class: "card-title" }, personName(stu)),
             h("div", { class: "card-sub v-admin-email" }, stu ? stu.email : "")),
           h("div", { class: "row row-wrap" },
-            h("span", { class: ["tag", active >= s.strikePauseAt ? "tag-bad" : active >= s.strikeWarnAt ? "tag-warn" : "tag-muted"] },
-              active + (active === 1 ? " active strike" : " active strikes")),
-            paused ? h("span", { class: "tag tag-bad" }, "Paused until " + fmt(stu.pausedUntil)) : null)),
-        tableWrap(["Strike", "Status", ""], rows)));
+            h("span", { class: "tag tag-info" }, "Showed up " + rel.shownUp + " of " + rel.promised),
+            tags)),
+        tableWrap(["Miss", "Status", ""], rows)));
     });
   }
 
@@ -604,6 +627,6 @@
   SB.router.register("/admin/courses", renderCourses);
   SB.router.register("/admin/slot/:id", renderSlot);
   SB.router.register("/admin/review", renderReview);
-  SB.router.register("/admin/strikes", renderStrikes);
+  SB.router.register("/admin/misses", renderMisses);
   SB.router.register("/admin/metrics", renderMetrics);
 })();

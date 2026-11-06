@@ -1,6 +1,7 @@
 /* js/views/after.js — the post-session question (#/after/:sessionId) and the exit survey with NPS
    (#/survey/exit). Reads state; open/closed decisions come from SB.rules.postOpen and SB.rules.surveyOpen;
-   writes go through SB.store.answerPost and SB.store.submitExit. */
+   writes go through SB.store.answerPost and SB.store.submitExit. The post-session screen also asks
+   "Who did you study with?" (D36). */
 (function () {
   "use strict";
   var SB = (window.SB = window.SB || {});
@@ -15,6 +16,7 @@
 
   // Unsent choices survive re-renders (the router redraws on every state change).
   var postDraft = {};   // seatId -> "more" | "same" | "less"
+  var withDraft = {};   // seatId -> [studentId] tapped in "Who did you study with?"
   var postError = {};   // seatId -> string
   var exitDraft = {};   // studentId -> { answers: {}, nps: number | null, error: string | null }
 
@@ -100,7 +102,7 @@
       var ended = slot && SB.clock.toMs(now) >= SB.clock.toMs(slot.end);
       var stillIn = seat.status === "placed" || seat.status === "confirmed" || seat.status === "attended";
       if (!stillIn || (ended && seat.status !== "attended")) {
-        msg = "This question is only for students who checked in at the session.";
+        msg = "This question is for students who were at the session. If you were there, a tablemate can still say you studied together.";
       } else if (!ended && slot) {
         msg = "This question opens when the session ends.";
         sub = "Check back after " + SB.clock.fmt(slot.end, "dayTime") + ".";
@@ -121,6 +123,27 @@
     var closes = slot ? SB.clock.add(slot.end, { hours: state.settings.postWindowHours }) : null;
     var redraw = function () { rerender(renderAfter, params, mount); };
 
+    // D36: a positive question. Tapping a tablemate counts them as there; nobody is asked who didn't come.
+    var mates = SB.rules.tablemates(state, now, seat.id);
+    var chosen = withDraft[seat.id] || (withDraft[seat.id] = []);
+    if (mates.length) {
+      root.appendChild(h("div", { class: "card v-after-q" },
+        h("h2", null, "Who did you study with?"),
+        h("p", { class: "muted small" }, "Tap everyone you studied with. It helps them get credit for showing up."),
+        h("div", { class: "v-after-mates" }, mates.map(function (m) {
+          var on = chosen.indexOf(m.studentId) >= 0;
+          return h("button", {
+            type: "button", class: ["choice", "v-after-mate", on && "selected"], "aria-pressed": on ? "true" : "false",
+            onclick: function () {
+              var i = chosen.indexOf(m.studentId);
+              if (i >= 0) chosen.splice(i, 1); else chosen.push(m.studentId);
+              redraw();
+            }
+          }, on ? "✓ " : "", m.firstName || "Someone");
+        }))
+      ));
+    }
+
     var c = h("div", { class: "card v-after-q" },
       h("h2", null, "Do you feel more prepared than studying alone?"),
       h("div", { class: "choice-list", role: "radiogroup" },
@@ -135,8 +158,8 @@
       postError[seat.id] ? h("div", { class: "notice notice-error mt" }, postError[seat.id]) : null,
       h("div", { class: "card-actions mt" },
         SB.ui.button("Send answer", function () {
-          var r = SB.store.answerPost(seat.id, postDraft[seat.id]);
-          if (r.ok) { delete postDraft[seat.id]; delete postError[seat.id]; }
+          var r = SB.store.answerPost(seat.id, postDraft[seat.id], chosen.slice());
+          if (r.ok) { delete postDraft[seat.id]; delete postError[seat.id]; delete withDraft[seat.id]; }
           else { postError[seat.id] = r.error; redraw(); }
         }, { kind: "primary", class: "btn-block", disabled: !picked })
       ),

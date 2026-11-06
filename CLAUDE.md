@@ -12,9 +12,9 @@ If the two disagree, the PRD wins. Point out the conflict instead of picking a s
    - No ES modules (`type="module"` is blocked on `file://`). Use classic `<script>` tags in the order `index.html` gives, and keep everything under one global, `window.SB`.
    - Use hash routing (`#/exams`), never the History API.
 3. **Mock data only.** No backend, no real email, no real push, no real GPS. All of these are simulated through the demo panel (see below).
-4. **State is saved in `localStorage`** under the key `sb.state.v1`. The first load copies the seed from `js/data.js`. The demo panel's **Reset** button restores the seed.
+4. **State is saved in `localStorage`** under the key `sb.state.v1`. The first load copies the seed from `js/data.js`. A saved state whose `version` differs from the seed's is replaced by the seed. The demo panel's **Reset** button restores the seed.
 5. **Phone-first.** Student screens render in a centered phone-width frame (max 420px). Admin screens use the full width and can stay plain.
-6. **All rules live in `js/rules.js`** as pure functions of `(state, now)`. Screens never decide locks, statuses, strikes or metrics themselves.
+6. **All rules live in `js/rules.js`** as pure functions of `(state, now)`. Screens never decide locks, statuses, misses or metrics themselves.
 7. **Only `js/store.js` writes state.** Every other file reads state and calls store actions.
 8. **Time comes only from the demo clock** (`SB.clock.now()`), never `new Date()` for "now". Times display in Mountain Time (`America/Denver`).
 9. **Don't guess.** If the PRD and this file don't answer a question, ask Ella before building it. Put new decisions in [Decisions made for the prototype](#decisions-made-for-the-prototype). Items under **Still open** are not to be built until answered.
@@ -23,10 +23,10 @@ If the two disagree, the PRD wins. Point out the conflict instead of picking a s
 ## Hard product rules (from the PRD — do not change)
 
 **Access and visibility**
-- A student joins through a **course link** (one per course section) and signs in with a `@byu.edu` email using a one-time link. Any other email is rejected. Opening another course's link adds that course to the student.
+- A student joins through a **course link** (one per course section) and signs in with a `@byu.edu` email using a one-time link. Any other email is rejected. Opening another course's link adds that course to the student. A signed-in student can also add any course from a list (D35, which departs from the PRD).
 - Before a slot locks, students see **counts only** for each slot, never names.
 - After lock, a student sees the **first name and year** of the others at their own table (see D12). Emails are visible only to admins.
-- Courses joined, check-ins, strikes and reports are visible only to admins. They are **never** shown to other students.
+- Courses joined, check-ins, misses, "studied with" answers and reports are visible only to admins. They are **never** shown to other students. A student sees their own shown-up record and miss notices only.
 - Location is read once, at the tap. Only `in range yes/no` and the time are stored, **never coordinates**.
 
 **Slots, locks and tables** (T = slot start)
@@ -40,32 +40,37 @@ If the two disagree, the PRD wins. Point out the conflict instead of picking a s
 | When | What happens |
 | --- | --- |
 | T−48h | Lock: form tables or drop the slot (above). |
-| T−3h | If a session has fewer than 3 students still placed (not cancelled), an alert goes to the admin. Nothing is auto-cancelled. |
-| T−30m | Push "Still coming?" with **Confirm** / **Can't make it**. |
+| T−24h | Students who must confirm early (D39) get "Still coming?". |
+| T−3h | Early-confirm students who haven't answered are **released** (no miss). Then, if a session has fewer than 3 students still placed (not cancelled), an alert goes to the admin. Nothing is auto-cancelled. |
+| T−30m | Push "Still coming?" with **Still coming** / **Can't make it**. |
 | T−15m → end | **I'm here** is available to placed students who haven't cancelled. |
-| T | Students who never answered are **released** (no strike). |
-| End | Push the post-session question. Confirmed students with no valid check-in become **no-shows** and get a strike. |
-| End → +24h | The post-session question can be answered. |
+| T | Students who never answered are **released** (no miss). |
+| End | Push the post-session question ("Who did you study with?" and how prepared) to students who checked in. |
+| End → +24h | The post-session question can be answered. A tablemate naming a student counts as that student attending (D36). |
+| End + 24h | Students who said Still coming but were never seen (no valid check-in, nobody named them) become **no-shows** and get a miss (D36). |
 
 **Attendance outcomes**
-| Student action | Recorded as | Strike? |
+| Student action | Recorded as | Miss? |
 | --- | --- | --- |
-| Cancelled any time before start (including Can't make it) | `cancelled` | No |
-| Didn't answer "Still coming?" | `released` (at T) | No |
-| Confirmed, then checked in | `attended` | No |
-| Confirmed, never checked in | `no_show` | Yes |
-| Checked in, location denied or failed | `attended`, check-in `unverified`, sent to admin review | Only if the admin rejects it |
+| Backed out any time before start (Can't make it) | `cancelled` | No |
+| Didn't answer "Still coming?" | `released` (at T, or T−3h for early-confirm seats) | No |
+| Said Still coming, then checked in | `attended` | No |
+| Said Still coming, didn't check in, a tablemate named them | `attended` (D36) | No |
+| Said Still coming, never seen | `no_show` (at End+24h) | Yes |
+| Checked in, location denied or failed | `attended`, check-in `unverified`, sent to admin review | Only if the admin rejects it and no tablemate named them |
 
-**Strikes**
-- A strike is given only when a student confirmed and didn't check in, or when an admin rejects an unverified check-in.
-- The 2nd strike triggers a warning.
-- The 3rd strike pauses sign-ups for 14 days. Picks and sessions in that period are cancelled, and the student is told why.
-- Admins can remove any strike.
+**Misses** (decided 2026-11-02; these replace the PRD's strikes, warning and 14-day pause, see D36–D40)
+- A miss is given only when a student said Still coming and nobody saw them, or when an admin rejects an unverified check-in that no tablemate vouched for. Absence alone is never a miss.
+- Nobody is ever asked to name someone who didn't come.
+- Each miss sends the student one private, gentle notice. Students see a positive record ("You've shown up to 4 of 4 sessions"), never a count of misses.
+- Misses count per class and reset when the class's next exam opens its study times (D37).
+- 2 recent misses in a class: that class's next sessions must be confirmed early (D39). There is no pause.
+- Admins can remove any miss.
 
 **Other musts**
 - Sign-up happens once: profile (first name, year, quiet or chatty; no photo), code of conduct, intake survey (required), then notification and location permission prompts.
-- The post-session question offers exactly: More prepared / About the same / Less prepared. Afterwards, the student is prompted to pick times for their next exam.
-- Each tablemate row has a **Report** button. Reports go to the admin review queue.
+- The post-session question offers exactly: More prepared / About the same / Less prepared. It is preceded by "Who did you study with?" (D36). Afterwards, the student is prompted to pick times for their next exam.
+- Each tablemate row has a **Report a concern** button, for safety and conduct only, never attendance. Reports go to the admin review queue.
 - **Delete account** in settings removes the student's data right away.
 
 ## Decisions made for the prototype
@@ -74,17 +79,17 @@ The PRD left these open. Ella decided them on 2026-10-21.
 
 | # | Question | Decision |
 | --- | --- | --- |
-| D1 | Student doesn't answer "Still coming?" | Released at start, no strike. |
+| D1 | Student doesn't answer "Still coming?" | Released at start, no miss. |
 | D2 | Check-in window | From T−15m until the session ends. |
 | D3 | How quiet/chatty works | The admin sets each slot as quiet or chatty. The student's preference **sorts** slots and labels them. It never hides any. |
 | D4 | The "nudge" when a slot is dropped | A notification names the most popular slot for the same exam that hasn't locked yet. One tap picks it. It is never picked automatically. |
 | D5 | A table falls below 3 after lock | The session goes ahead. The low-turnout alert covers it. |
 | D6 | Picking a locked slot | Not allowed. Picking closes at lock. |
 | D7 | Low-turnout alert (the PRD says "fewer than 3 confirmed" at T−3h, but confirmations only happen at T−30m) | Count students still placed (not cancelled) at T−3h. |
-| D8 | 3rd-strike pause | Cancel the student's open picks and placed sessions whose start falls in the 14 days, and tell them why. |
+| D8 | 3rd-strike pause | *Replaced by D39: there is no pause.* |
 | D9 | Simulating time, push and GPS | A demo panel with a fake clock, a location toggle, a user switch and Reset. State persists in `localStorage`. |
 | D10 | Scope | Student app plus admin console, plus intake and exit surveys and NPS. **No** CSV export (this departs from the PRD's in-scope list) and no professor dashboard. |
-| D11 | Unverified check-in | Counts as attended unless an admin rejects it. A rejection makes it `no_show` with a strike. |
+| D11 | Unverified check-in | Counts as attended unless an admin rejects it. A rejection makes it `no_show` with a miss, unless a tablemate named the student (D36). |
 | D12 | When tablemates are visible | At lock, own table only. |
 | D13 | Sign-up conversion denominator | The admin enters an enrollment count on each course. |
 | D14 | When the surveys are asked | Intake is required at sign-up. Exit and NPS open on a **pilot end date** that the admin sets. |
@@ -92,11 +97,11 @@ The PRD left these open. Ella decided them on 2026-10-21.
 | D16 | Post-session question window | Open for 24 hours after the session ends. |
 | D17 | Content the PRD leaves open (courses, exams, slots, spots, survey questions, code of conduct) | Realistic placeholders in `js/data.js`, each tagged `PLACEHOLDER`. |
 | D18 | A placed student who hasn't confirmed taps I'm here between T−15m and T | The check-in counts as confirming: `confirmedAt` is set to the check-in time and the seat becomes `attended`. They are not released at T. |
-| D19 | When Confirm / Can't make it are available | From T−30m until T, for `placed` seats only. **Cancel** is available from lock until T, for `placed` or `confirmed` seats. |
-| D20 | Who gets the post-session question | Only students whose seat is `attended` at End. |
+| D19 | When Confirm / Can't make it are available | From T−30m until T, for `placed` seats only (early-confirm seats: D39). **Cancel** is available from lock until T, for `placed` or `confirmed` seats. The screen shows both as one **Can't make it** button (D40). |
+| D20 | Who gets the post-session question | Students whose seat is `attended` at End, plus anyone who becomes `attended` later because a tablemate named them (D36). |
 | D21 | The nudge when the student already picked the most popular slot | Suggest the most popular open slot for that exam that the student has **no active pick** on. If none is left, see Still open #6. |
-| D22 | Removing a strike from a paused student | If the student's active strikes drop below 3, the pause lifts right away (`pausedUntil = null`). Picks and seats already cancelled stay cancelled. |
-| D23 | When the 14-day pause starts | At the moment the 3rd strike is given: session End for a no-show, or the admin's rejection time for an unverified check-in. |
+| D22 | Removing a strike from a paused student | *Replaced: there is no pause (D39). Removing a miss stops it counting; seats already set to confirm early stay that way.* |
+| D23 | When the 14-day pause starts | *Replaced: there is no pause (D39). A miss is dated End+24h for a no-show, or the admin's decision time for a rejected check-in.* |
 | D24 | Match rate and removed picks | Only picks still active at lock or drop count. A student who removed all their picks before lock is not in the denominator. |
 | D25 | How metrics are broken down | Every metric shows a pilot-wide number plus one row per course. |
 | D26 | What Delete account removes | Every record tied to the student, deleted right away (see Build conventions). Metrics are recomputed without them, and tablemates stop seeing them. |
@@ -107,15 +112,26 @@ The PRD left these open. Ella decided them on 2026-10-21.
 | D31 | The spot list runs out (Still open #2) | The extra table still forms, with spot `"To be announced"`, and `out_of_spots` goes to `"admin"`. |
 | D32 | One student, two locked slots for the same exam (Still open #3) | Placed in both. The same applies to overlapping slots in different courses. The student can cancel either one. |
 | D33 | Out-of-range I'm here (Still open #5) | Each failed attempt is stored as a check-in with result `out_of_range`. I'm here stays available until End, and any later valid check-in counts. |
-| D34 | Signing in with no course link (Still open #9) | Allowed. A new student signs up as usual, and `#/exams` shows "Open your course link to add a course." |
+| D34 | Signing in with no course link (Still open #9) | Allowed. A new student signs up as usual, and `#/exams` offers **Add a class** (D35). |
+| D35 | Adding a course without its link (decided 2026-11-02; departs from the PRD, where joining is by course link only) | A student who has finished sign-up can add any course from a list at `#/classes`, reached from `#/exams` and `#/me`. Course links still work as before. Removing a course is not built. |
+
+D36–D40 were decided on 2026-11-02. They replace the PRD's strike system (strikes, 2nd-strike warning, 3rd-strike 14-day pause) with a reliability system that never asks students to report absence.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| D36 | What counts as attending | A valid check-in **or** being named by a tablemate in "Who did you study with?" (asked with the post-session question; the student taps tablemates' first names). Naming a `confirmed` seat makes it `attended` and sends that student the post-session question. Misses are decided at End+24h, when that window closes. Rejecting an unverified check-in gives no miss if a tablemate named the student. Naming someone who cancelled or was released changes nothing. |
+| D37 | When misses reset | Per class. A miss counts until the next exam in the same class opens its study window (that exam's time minus `slotWindowDays`, 5 days). A miss in one class never affects another. |
+| D38 | What students see | Each miss sends one private `miss_notice`: the 1st is gentle ("Life happens!…"); one that brings the class to 2 explains confirming early. `#/me` shows "You've shown up to X of Y sessions you said you'd come to" (Y = attended + no-shows whose miss wasn't removed). Never shown to anyone else. |
+| D39 | The consequence of 2 recent misses | At lock, a seat whose student has 2+ recent misses in that class gets `earlyConfirm: true` (fixed for that seat). Still coming / Can't make it are available from lock until T−3h; "Still coming?" is sent at T−24h; no answer by T−3h releases the seat with no miss. **There is no pause.** Seats aren't changed afterwards, by later misses or by removing one. "Reliable students placed first" is not built: slots have no seat limit, so nobody is ever left out. |
+| D40 | Backing out | One tap on **Can't make it**, no confirmation dialog, with "No problem, we'll let your group know. Thanks for the heads-up!". The others still at the table get `mate_cancelled` naming the student by first name. Never a miss. |
 
 How the prototype reads the PRD (interpretations, not new rules):
 - Both Ella and Ash are admins, each with their own account and the same rights.
-- "Can't make it" is a cancellation before start, so it gets no strike (PRD TC9).
+- "Can't make it" is a cancellation before start, so it gets no miss (PRD TC9).
 - The connection question is yes/no: "Do you know someone in this class to study with?" The metric compares the share answering yes in the exit survey with the intake survey, for students who answered both.
 - An `out_of_range` check-in is stored but is not a valid check-in, so the seat stays as it was. The student can retry (D33).
 - Picking closes at lock (D6), so unpicking does too. Cancelling is only possible before start, so Cancel is hidden from T on.
-- A strike counts while `removed` is false. The warning fires when a new strike brings a student's active count to exactly 2. A pause starts when a new strike brings it to 3 or more. If the student is already paused, `pausedUntil` becomes the later of the two end dates.
+- A miss counts while `removed` is false and its class hasn't reset (D37).
 - "Students who sign up" (sign-up conversion) means students with that course who have finished all four sign-up steps.
 - The exit survey and NPS go to every student who has finished sign-up.
 - The 90-day retention rule in the PRD is a pilot policy, not a prototype feature. It is out of scope.
@@ -147,40 +163,43 @@ Hash routes, handled by `js/router.js`. Guards:
 | `#/join/:linkCode` | Course link landing: course name and section, then sign in. Adds the course after sign-in. If the student is already signed in and has finished sign-up, the course is added right away and they go to `#/exams`. If they're signed in but not finished, the course is added and they continue sign-up. An unknown code shows "This link isn't valid" and nothing else. |
 | `#/signin` | Email field. A `@byu.edu` email → "Link sent" screen with an **Open link (demo)** button. Any other email → rejected with a message. Tapping **Open link (demo)** signs the user in. An admin's email opens the admin console. A known student's email signs that student in. A new email creates the student record (profile fields `null`) and adds the pending course, if there is one. No notification record is made for sign-in. |
 | `#/onboarding/profile` → `conduct` → `intake` → `permissions` | One-time sign-up steps, in order. You can go back but not skip ahead. |
-| `#/exams` | Home. Upcoming exams for each of the student's courses, each with its candidate slots. Each slot shows its pick count, type, place and a pick toggle. Locked sessions appear at the top. An exam shows until its `at` time. Under each exam, only `open` slots are listed, sorted with the student's preferred type first and then by start time. The student's own sessions (any seat status) appear at the top. Dropped slots, and locked slots where they have no seat, are hidden. While paused, pick toggles are disabled and a line says until when. |
-| `#/session/:id` | A locked session: time, spot, tablemates (first name and year) each with Report, Confirm / Can't make it, I'm here, Cancel. |
-| `#/after/:id` | Post-session question, then a prompt to pick times for the next exam. Open for 24h. |
-| `#/me` | Profile and preference (editable), strike warning if any, settings, sign out, delete account. |
+| `#/exams` | Home. Upcoming exams for each of the student's courses, each with its candidate slots. Each slot shows its pick count, type, place and a pick toggle. Locked sessions appear at the top. An exam shows until its `at` time. Under each exam, only `open` slots are listed, sorted with the student's preferred type first and then by start time. The student's own sessions (any seat status) appear at the top. Dropped slots, and locked slots where they have no seat, are hidden. |
+| `#/session/:id` | A locked session: time, spot, tablemates (first name and year) each with Report a concern, then **Still coming** / **Can't make it** (D40). I'm here is in the check-in bar (below). |
+| `#/after/:id` | "Who did you study with?" (tablemates' first names to tap, D36), the post-session question, then a prompt to pick times for the next exam. Open for 24h. |
+| `#/me` | The student's own shown-up record (D38) and early-confirm note if any (D39), profile and preference (editable), the student's classes with **Add a class**, settings, sign out, delete account. |
+| `#/classes` | Every course (name and section) with a search box. Courses not yet added have **Add**; added ones show "Added" (D35). |
 | `#/survey/exit` | Exit survey plus NPS, available from the pilot end date. |
 
 Student bottom tabs: **Exams · Me**. Notifications show as in-app banners at the top. Tapping one goes to its route.
 
+**Check-in bar:** while any of the student's seats has `canCheckIn` (T−15m until End), a bar under the top bar on every student screen shows the session time and place with an **I'm here** button. Tapping it checks in and opens that session, which shows the result.
+
 **Banners:** banners show the current user's unread notifications, newest first, at most 3 at a time. Admins see the notifications addressed to `"admin"`. Tapping a banner marks it read and goes to its route. A close button (×) marks it read without moving. The two admins share one read flag on each admin notification.
 
-**Admin tabs:** **Courses · Review · Strikes · Metrics**, along the top, at full width.
+**Admin tabs:** **Courses · Review · Misses · Metrics**, along the top, at full width.
 
 **Admin** (shown when the current user is an admin)
 | Route | Screen |
 | --- | --- |
 | `#/admin/courses` | Courses (name, section, link code, enrollment), their exams, and the slots for each exam, with create and edit. Also the **Admin inbox** (low-turnout and out-of-spots alerts). |
-| `#/admin/slot/:id` | One slot: pick count, lock result, tables, and each student's status, confirmation and check-in result. |
+| `#/admin/slot/:id` | One slot: pick count, lock result, tables, and each student's status, confirmation (and whether they must confirm early), check-in result and who named them. |
 | `#/admin/review` | Queue of unverified check-ins and reports, each with Accept / Reject. |
-| `#/admin/strikes` | Strikes per student, with Remove. |
+| `#/admin/misses` | Misses per student, each marked as counting this exam or reset, the student's shown-up record and recent misses per class, with Remove. |
 | `#/admin/metrics` | The six pilot metrics, plus no-show rate and NPS. |
 
 **Demo panel** (always visible as a collapsible drawer and **not part of the product**)
-- **Clock:** shows the fake "now" in MT. Buttons: +15m, +1h, +1 day, and for a chosen slot "Jump to" Lock (T−48h) / T−3h / T−30m / T−15m / T / End / End+24h. The clock only moves forward, except through Reset. A "Jump to" target that is already past is disabled.
+- **Clock:** shows the fake "now" in MT. Buttons: +15m, +1h, +1 day, and for a chosen slot "Jump to" Lock (T−48h) / T−24h / T−3h / T−30m / T−15m / T / End / End+24h. The clock only moves forward, except through Reset. A "Jump to" target that is already past is disabled.
 - **Location:** In range / Out of range / Denied. This decides the result of the next I'm here tap.
 - **User:** switch to any mock student or admin.
 - **Reset:** reloads the seed data.
 
-Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` to apply every time-based transition between the old "now" and the new one. These transitions are locks, drops, alerts, confirmation pushes, releases, no-shows, strikes and post-session pushes. They are applied in time order. Running `tick` twice must not repeat any effect. See [Timeline engine](#timeline-engine) for the signature, the job flags and how ties are ordered.
+Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` to apply every time-based transition between the old "now" and the new one. These transitions are locks, drops, alerts, confirmation pushes, releases, post-session pushes, no-shows and misses. They are applied in time order. Running `tick` twice must not repeat any effect. See [Timeline engine](#timeline-engine) for the signature, the job flags and how ties are ordered.
 
 ## Data contract
 
 `js/data.js` sets `window.SB.seed`, which has the shape below. `localStorage` holds the same shape. Field names are fixed; adding a field means updating this section first.
 
-- IDs are strings with a prefix (`stu_`, `adm_`, `crs_`, `exm_`, `slt_`, `pck_`, `ses_`, `set_`, `chk_`, `stk_`, `rpt_`, `ntf_`).
+- IDs are strings with a prefix (`stu_`, `adm_`, `crs_`, `exm_`, `slt_`, `pck_`, `ses_`, `set_`, `chk_`, `mis_`, `rpt_`, `ntf_`).
   - New IDs come only from `SB.rules.nextId(state, prefix)`. It increments `state.seq` and returns `prefix + seq`, for example `"ntf_57"`. There are no random IDs, so tests are repeatable.
   - Seed IDs are hand-written and readable, for example `"slt_stat121_mon"`.
 - Times are ISO 8601 strings with an offset, e.g. `"2026-11-17T16:00:00-07:00"`.
@@ -195,7 +214,7 @@ Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` t
 
 ```js
 SB.seed = {
-  version: 1,
+  version: 2,                       // bump when this shape changes; older saved states are replaced by the seed
   seq: number,                      // last number used by nextId; the seed sets it above every seeded number
   jobs: { surveyOpenSent: bool },   // global timeline job: survey_open sent at settings.pilotEnd
   demo: { now: ISO, currentUserId: "stu_…" | "adm_…" | null, location: "in_range" | "out_of_range" | "denied",
@@ -205,8 +224,8 @@ SB.seed = {
     pilotEnd: ISO,                                   // PLACEHOLDER; opens exit survey + NPS
     lockHoursBefore: 48, minGroup: 3, maxPerTable: 6,
     lowTurnoutHoursBefore: 3, confirmMinutesBefore: 30, checkInOpensMinutesBefore: 15,
-    checkInRadiusM: 150, postWindowHours: 24,
-    strikeWarnAt: 2, strikePauseAt: 3, strikePauseDays: 14
+    checkInRadiusM: 150, postWindowHours: 24, slotWindowDays: 5,
+    earlyConfirmAfterMisses: 2, earlyConfirmAskHoursBefore: 24, earlyConfirmByHoursBefore: 3   // D39
   },
   admins: [{ id: "adm_…", name: string, email: string }],   // Ella, Ash; @byu.edu emails, so they can sign in at #/signin
 
@@ -230,26 +249,27 @@ SB.seed = {
     year: "Freshman" | "Sophomore" | "Junior" | "Senior" | "Grad" | null,
     vibe: "quiet" | "chatty" | null,
     courseIds: ["crs_…"],
-    onboarding: { profile: bool, conduct: bool, intake: bool, permissions: bool },
-    pausedUntil: ISO | null
+    onboarding: { profile: bool, conduct: bool, intake: bool, permissions: bool }
   }],
 
   picks: [{
     id: "pck_…", slotId: "slt_…", studentId: "stu_…", at: ISO,
     status: "active" | "removed" | "placed" | "not_placed",   // at lock or drop, every active pick becomes placed or not_placed (a dropped slot's picks are all not_placed)
-    removedReason: "student" | "strike_pause" | null
+    removedReason: "student" | null
   }],                               // unpicking marks the pick removed; picking again creates a new pick, so a student has at most one active pick per slot
 
   sessions: [{                      // one per table of a locked slot
     id: "ses_…", slotId: "slt_…", table: number, spot: string,
-    jobs: { lowTurnoutSent: bool, confirmSent: bool, startDone: bool, endDone: bool }
+    jobs: { earlyAskSent: bool, lowTurnoutSent: bool, earlyReleaseDone: bool, confirmSent: bool,
+            startDone: bool, endDone: bool, finalDone: bool }
   }],
 
   seats: [{                         // a student's place at one session
     id: "set_…", sessionId: "ses_…", studentId: "stu_…",
     status: "placed" | "confirmed" | "cancelled" | "released" | "attended" | "no_show",
-    confirmedAt: ISO | null, cancelledAt: ISO | null,
-    cancelReason: "student" | "cant_make_it" | "strike_pause" | null
+    confirmedAt: ISO | null, cancelledAt: ISO | null,  // confirmedAt = when they said Still coming
+    cancelReason: "student" | "cant_make_it" | null,
+    earlyConfirm: bool              // D39: set at lock; must answer by T−3h
   }],
 
   checkins: [{
@@ -258,16 +278,16 @@ SB.seed = {
     adminDecision: "accepted" | "rejected" | null         // only for unverified
   }],
 
-  strikes: [{ id: "stk_…", studentId, seatId, at: ISO, removed: boolean }],
+  misses:  [{ id: "mis_…", studentId, seatId, examId, at: ISO, removed: boolean }],   // examId drives the per-class reset (D37)
   reports: [{ id: "rpt_…", sessionId, byStudentId, aboutStudentId, text: string, at: ISO, adminDecision: "accepted" | "rejected" | null }],
 
-  postAnswers:   [{ seatId, answer: "more" | "same" | "less", at: ISO }],
+  postAnswers:   [{ seatId, answer: "more" | "same" | "less", studiedWith: ["stu_…"], at: ISO }],   // studiedWith: tablemates named (D36)
   surveyAnswers: [{ studentId, kind: "intake" | "exit", answers: { [questionId]: string | number }, nps: number | null, at: ISO }],
 
   notifications: [{
     id: "ntf_…", to: "stu_…" | "admin", at: ISO, read: boolean, route: string,
     kind: "session_confirmed" | "slot_dropped" | "still_coming" | "post_session"
-        | "strike_warning" | "strike_pause" | "survey_open" | "low_turnout" | "out_of_spots",
+        | "miss_notice" | "mate_cancelled" | "survey_open" | "low_turnout" | "out_of_spots",
     slotId: "slt_…" | null, sessionId: "ses_…" | null,
     suggestedSlotId: "slt_…" | null,     // only for slot_dropped
     text: string
@@ -278,17 +298,18 @@ SB.seed = {
 **Seed requirements.**
 - Set `demo.now` partway through a midterm cycle, so some slots have locked, some sessions are in the past, and the metrics show real numbers. Put every seeded time in November 2026, so every offset is −07:00.
 - Set `demo.currentUserId` to `null` and `demo.pendingLinkCode` to `null`.
-- Set every `jobs` flag to match `demo.now`. A job whose time has passed is `true`, and its effects (seats, strikes, notifications) are in the seed.
+- Set every `jobs` flag to match `demo.now`. A job whose time has passed is `true`, and its effects (seats, misses, notifications) are in the seed.
 - Include 2–3 courses, each with 2 exams (so repeat use can be shown), about 15 students, and both admins (Ella and Ash).
 - Include slots in every state:
   - one open slot about 49h out with 3+ picks, so it locks in the demo;
   - one open slot about 49h out with 2 picks, so it drops;
   - one open slot with 7+ picks, so it splits into two tables;
   - a locked session about 4h out with 2 students, for the low-turnout alert.
-- Include one student with 1 strike, one with 2 strikes, and one with an unverified check-in waiting for review.
+- Include one student with 1 miss, one with 2 misses, and one with an unverified check-in waiting for review.
 - Make the data internally consistent:
   - every `attended` seat has a check-in;
-  - every `no_show` seat has a strike unless that strike was removed;
+  - every `no_show` seat has a miss unless that miss was removed;
+  - every `studiedWith` entry names a tablemate;
   - every `placed` pick has a seat.
   - The "locked session about 4h out with 2 students" was locked with 3 or more, and the others cancelled afterwards.
 - `js/data.js` also sets `SB.seedExpectedMetrics`, the hand-computed result of `SB.rules.metrics(SB.seed)`, both overall and per course. This is test data, not state, so it never goes into `localStorage`.
@@ -300,7 +321,7 @@ SB.seed = {
   - Each value is `{ num, den, value }`. `value` is `null` when `den` is 0.
 - **Sign-up conversion** (per course) = students with that course who have finished all four sign-up steps ÷ `course.enrolled`.
 - **Match rate** = students with at least one `placed` pick ÷ students with at least one `placed` or `not_placed` pick. Removed picks never count (D24).
-- **Show-up rate** = seats with a valid check-in ÷ seats confirmed at session start (`confirmedAt` set and not cancelled before start).
+- **Show-up rate** = seats with valid attendance ÷ seats confirmed at session start (`confirmedAt` set and not cancelled before start). Valid attendance is a valid check-in or being named by a tablemate (D36).
 - **Repeat use**: see Still open #7. Don't build it until that's answered. Until then, `metrics` returns `repeatUse: null`, and the admin screen shows the tile as "Waiting on a decision".
 - **Better prepared** = `more` ÷ all post-session answers.
 - **Connection** = the share answering yes to the exit connection question, minus the share answering yes to the intake one, for students who answered both.
@@ -314,27 +335,33 @@ SB.seed = {
 - It takes the old "now" from `state.demo.now` and returns a new state with `demo.now = now`.
 - It applies every due job in the range (old now, now], using the flags below. A job whose flag is already `true` is skipped, which is why running `tick` twice repeats nothing.
 - Jobs whose time is the same are run in this order:
-  1. End
-  2. T (start)
-  3. T−30m
-  4. T−3h
-  5. Lock
-  6. Pilot end
-- The order makes strikes and pauses settle before any slot locks, so a lock sees the final picks.
+  1. Final (End+24h)
+  2. End
+  3. T (start)
+  4. T−30m
+  5. Early release (T−3h)
+  6. Low turnout (T−3h)
+  7. Early ask (T−24h)
+  8. Lock
+  9. Pilot end
+- The order makes misses settle before any slot locks, so a lock sees the final recent-miss counts (D39), and frees early-confirm seats before the low-turnout count.
 - Ties within one job type are broken by slot start, then by ID.
 
 | Job | Time | Flag | Effect |
 | --- | --- | --- | --- |
-| Lock | slot start − 48h | `slot.jobs.lockDone` | Form tables or drop the slot. Active picks become `placed` or `not_placed`. Send `session_confirmed`, or `slot_dropped` with its suggestion. Tables are formed by D30. If spots run out, the table still forms with spot "To be announced" and `out_of_spots` is sent (D31). |
+| Lock | slot start − 48h | `slot.jobs.lockDone` | Form tables or drop the slot. Active picks become `placed` or `not_placed`. Each seat's `earlyConfirm` is set from recent misses (D39). Send `session_confirmed`, or `slot_dropped` with its suggestion. Tables are formed by D30. If spots run out, the table still forms with spot "To be announced" and `out_of_spots` is sent (D31). |
+| Early ask | T − 24h | `session.jobs.earlyAskSent` | Send `still_coming` to every `placed` seat with `earlyConfirm`. |
+| Early release | T − 3h | `session.jobs.earlyReleaseDone` | `placed` seats with `earlyConfirm` → `released` (no miss). |
 | Low turnout | T − 3h | `session.jobs.lowTurnoutSent` | If fewer than 3 seats are `placed` or `confirmed`, send `low_turnout` to `"admin"`. |
 | Still coming? | T − 30m | `session.jobs.confirmSent` | Send `still_coming` to every `placed` seat. |
 | Start | T | `session.jobs.startDone` | `placed` seats → `released`. |
-| End | slot end | `session.jobs.endDone` | `confirmed` seats with no valid check-in → `no_show` plus a strike (which can trigger the warning or a pause). Send `post_session` to `attended` seats (D20). |
+| End | slot end | `session.jobs.endDone` | Send `post_session` to `attended` seats (D20). |
+| Final | slot end + 24h | `session.jobs.finalDone` | `confirmed` seats with no valid attendance → `no_show` plus a miss and its `miss_notice` (D36, D38). |
 | Pilot end | `settings.pilotEnd` | `state.jobs.surveyOpenSent` | Send `survey_open` to every student who has finished sign-up. |
 
 **Rule details** (`rules.js` follows these exactly)
 - **Seat actions.** `SB.rules.seatActions(state, now, seatId)` returns `{ canConfirm, canCantMakeIt, canCancel, canCheckIn, canReport }`. Screens show buttons only from this result.
-  - Confirm / Can't make it: D19.
+  - Confirm / Can't make it: D19, or D39 for an `earlyConfirm` seat.
   - Cancel: D19.
   - I'm here: from T−15m until End, for `placed` or `confirmed` seats.
   - Report: D27.
@@ -343,16 +370,15 @@ SB.seed = {
   - `denied` → result `unverified`, the seat becomes `attended`, and the check-in goes to admin review;
   - `out_of_range` → the result is stored, the seat is unchanged, and the student can retry (D33);
   - a `placed` seat also gets `confirmedAt` set to the check-in time (D18).
-- **Rejecting an unverified check-in.** The seat becomes `no_show`, and a strike is given at the decision time (D11, D23).
+- **Rejecting an unverified check-in.** Unless a tablemate named the student, the seat becomes `no_show` and a miss is given at the decision time (D11, D36).
+- **Who did you study with?** `answerPost(seatId, answer, studiedWith)`. Every ID must be a tablemate at the student's own table (not themselves). Each named `confirmed` seat → `attended`, and that student gets `post_session` (D36).
+- **Backing out.** `cantMakeIt` and `cancel` send `mate_cancelled` to every other `placed` or `confirmed` seat at the table (D40).
 - **Drop suggestion.** Look at `open` slots for the same exam where this student has no active pick (D21). Pick the one with the most active picks. Break ties by earliest start, then by ID. If none is found, set `suggestedSlotId: null` (Still open #6).
-- **Strike pause.** `pausedUntil = strike.at + 14 days`.
-  - Cancel the student's active picks on slots that start before then (`removed`, `strike_pause`).
-  - Cancel their `placed` or `confirmed` seats in sessions that start before then (`cancelled`, `strike_pause`).
-  - Send one `strike_pause` notification.
+- **Misses.** A miss is recent while it isn't removed and `now` is before the next exam in the same class minus `slotWindowDays` (D37). Each new miss sends one `miss_notice` (D38). There is no pause.
 - **Delete account** removes every record tied to the student, in one action:
   - the student;
-  - their picks, seats and strikes;
-  - check-ins and post-session answers for their seats;
+  - their picks, seats and misses;
+  - check-ins and post-session answers for their seats, and their ID from others' `studiedWith`;
   - reports they made or that are about them;
   - their survey answers;
   - notifications addressed to them.
@@ -385,12 +411,12 @@ These are the only cross-file entry points. A builder must not add another witho
   - `joinCourse(linkCode)`;
   - `signOut()`.
 - Sign-up: `saveProfile({ firstName, year, vibe })`, `acceptConduct()`, `submitIntake(answers)`, `finishPermissions()`.
-- Student: `pick(slotId)`, `unpick(slotId)`, `confirm(seatId)`, `cantMakeIt(seatId)`, `cancel(seatId)`, `checkIn(seatId)`, `report(sessionId, aboutStudentId, text)`, `answerPost(seatId, answer)`, `submitExit(answers, nps)`, `deleteAccount()`.
+- Student: `addCourse(courseId)` (D35), `pick(slotId)`, `unpick(slotId)`, `confirm(seatId)`, `cantMakeIt(seatId)`, `cancel(seatId)`, `checkIn(seatId)`, `report(sessionId, aboutStudentId, text)`, `answerPost(seatId, answer, studiedWith)`, `submitExit(answers, nps)`, `deleteAccount()`.
 - Notifications: `markRead(notificationId)`.
 - Admin:
   - `saveCourse(course)`, `saveExam(exam)`, `saveSlot(slot)`, which create when `id` is missing and edit otherwise. Edits are allowed only before lock (D29, Still open #10).
   - `setPilotEnd(iso)`.
-  - `decideCheckin(checkinId, "accepted" | "rejected")`, `decideReport(reportId, "accepted" | "rejected")`, `removeStrike(strikeId)`.
+  - `decideCheckin(checkinId, "accepted" | "rejected")`, `decideReport(reportId, "accepted" | "rejected")`, `removeMiss(missId)`.
 
 **`SB.rules`** (pure; `tests.html` calls these directly)
 - Timeline and IDs: `tick(state, now)`, `nextId(state, prefix)`.
@@ -401,7 +427,8 @@ These are the only cross-file entry points. A builder must not add another witho
   - `canPick(state, now, studentId, slotId)`;
   - `seatActions(state, now, seatId)`;
   - `tablemates(state, now, seatId)`, which returns `{ studentId, firstName, year }` only;
-  - `activeStrikes(state, studentId)`, `isPaused(state, now, studentId)`;
+  - `recentMisses(state, now, studentId, courseId)`, `isRecentMiss(state, now, missId)` (D37);
+  - `reliability(state, studentId)` → `{ shownUp, promised }` (D38);
   - `postOpen(state, now, seatId)`, `surveyOpen(state, now)`;
   - `slotWarnings(state, slot)` for D29;
   - `metrics(state)`.
@@ -441,15 +468,15 @@ Each file has one owner and one job. If a change touches another file's job, mak
 | `js/data.js` | Ella | Mock seed data and every `PLACEHOLDER` content item |
 | `js/clock.js` | Ella | The demo "now" and all time formatting and math in Mountain Time |
 | `js/store.js` | Ella | Loading, saving and resetting state, and every action that changes state |
-| `js/rules.js` | Ella | Pure rules: timeline `tick`, locking and table splitting, drops and suggestions, seat transitions, check-in validity, strikes, sorting, visibility, metrics |
+| `js/rules.js` | Ella | Pure rules: timeline `tick`, locking and table splitting, drops and suggestions, seat transitions, check-in validity, attendance, misses, sorting, visibility, metrics |
 | `js/notify.js` | Ella | Drawing notifications as in-app banners and marking them read |
-| `js/router.js` | Ella | Route matching, guards and the student and admin tab bars. Views register their own routes with `SB.router.register`. |
+| `js/router.js` | Ella | Route matching, guards, the student and admin tab bars, and the student check-in bar. Views register their own routes with `SB.router.register`. |
 | `js/ui.js` | Ella | Small DOM helpers (`h()`, card, button, empty state). No business logic. |
 | `js/views/signin.js` | Ella | Course link landing, sign-in and link-sent screens |
 | `js/views/onboarding.js` | Ella | The four sign-up steps |
-| `js/views/exams.js` | Ella | Exam view with slot picking, and the session screen (confirm, check-in, tablemates, report, cancel) |
-| `js/views/after.js` | Ella | Post-session question and the exit survey with NPS |
-| `js/views/me.js` | Ella | Profile, preference, settings, delete account |
+| `js/views/exams.js` | Ella | Exam view with slot picking, and the session screen (Still coming, Can't make it, tablemates, report a concern) |
+| `js/views/after.js` | Ella | "Who did you study with?", the post-session question, and the exit survey with NPS |
+| `js/views/me.js` | Ella | Shown-up record, profile, preference, settings, delete account, and the `#/classes` list (D35) |
 | `js/views/admin.js` | Ella | All admin screens |
 | `js/demo.js` | Ella | The demo panel: clock, location, user switch, reset |
 | `js/main.js` | Ella | Startup: load the store, start the router, draw the first screen |
@@ -472,26 +499,26 @@ Notification records are created by `rules.js`, as part of `tick` and of the tra
 2. **Open `tests.html`.** Every rule check passes. The checks cover at least:
    - each row of the attendance table;
    - lock with 3+, lock with 8 (two tables of 4), and drop with 2 plus its suggestion;
-   - D1, D2, D5–D8 and D11;
-   - the 2-strike warning and the 3-strike pause;
+   - D1, D2, D5–D7, D11 and D36–D40;
+   - the gentle miss notice, the per-class reset, and confirming early after 2 misses;
    - running `tick` twice;
    - every metric against hand-computed seed values.
 3. **Walk the happy path with the demo panel:**
    - open a course link, sign in, finish sign-up, pick slots and watch the counts change;
    - jump to Lock and see "session confirmed" with tablemates;
-   - jump to T−30m and confirm, then jump to T−15m with In range and tap I'm here;
-   - jump to End and answer the post-session question;
-   - check that the student shows as attended in the admin slot view.
+   - jump to T−30m and tap Still coming, then jump to T−15m with In range and tap I'm here in the check-in bar;
+   - jump to End, name a tablemate in "Who did you study with?" and answer the post-session question;
+   - check that both show as attended in the admin slot view (the tablemate with "Named by").
 4. **Walk the failure paths:**
    - a slot with 2 picks drops at Lock, and the suggestion picks another slot in one tap;
-   - an unanswered confirmation is released at T, with no strike;
-   - confirmed but no check-in becomes a no-show plus a strike;
-   - Denied location gives an unverified check-in, which appears in the review queue. Reject it and see the strike;
-   - a 3rd strike blocks picking, and existing picks and sessions are cancelled with a notice;
+   - Can't make it is one tap, and the rest of the table gets a notice;
+   - an unanswered Still coming? is released at T, with no miss;
+   - Still coming but never seen stays pending until End+24h, then becomes a no-show plus a gentle miss notice;
+   - Denied location gives an unverified check-in, which appears in the review queue. Reject it and see the miss;
    - a session with 2 students at T−3h appears in the Admin inbox.
 5. **Check privacy:**
    - before lock, slots show only counts;
    - after lock, a student sees only their own table's first names and years;
-   - no student screen ever shows an email, a strike count, a check-in result or a report about another student;
+   - no student screen ever shows an email, a miss count, a check-in result, a "studied with" answer or a report about another student;
    - `localStorage` contains no coordinates.
 6. **Reload and Reset.** A reload keeps state. Reset brings back the seed exactly.

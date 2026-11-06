@@ -17,3 +17,5 @@
 .v-after .v-after-nps { gap: 4px; flex-wrap: nowrap; }
 .v-after .v-after-nps button { flex: 1 1 0; min-width: 0; padding: 0; }
 .v-after .v-after-ends { margin-top: 4px; }
+.v-after .v-after-mates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.v-after .v-after-mates .v-after-mate { width: auto; flex: 0 1 auto; border-radius: 999px; padding: 10px 18px; }

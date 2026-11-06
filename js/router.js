@@ -13,6 +13,7 @@
  *  - Sign-up not finished → #/onboarding/<first unfinished step>. Earlier steps may be revisited.
  *  - Admin on a non-admin route → #/admin/courses. Student on an admin route → #/exams.
  *  - Unknown route → the user's home.
+ * Signed-up students also get a check-in bar under the top bar while any of their seats can check in.
  * A known route with no registered view shows a "Not built yet" card.
  */
 (function () {
@@ -27,8 +28,8 @@
   var KNOWN = [
     "/join/:linkCode", "/signin",
     "/onboarding/profile", "/onboarding/conduct", "/onboarding/intake", "/onboarding/permissions",
-    "/exams", "/session/:id", "/after/:id", "/me", "/survey/exit",
-    "/admin/courses", "/admin/slot/:id", "/admin/review", "/admin/strikes", "/admin/metrics"
+    "/exams", "/session/:id", "/after/:id", "/me", "/classes", "/survey/exit",
+    "/admin/courses", "/admin/slot/:id", "/admin/review", "/admin/misses", "/admin/metrics"
   ];
 
   var routes = []; // { pattern, parts, fn }
@@ -176,14 +177,53 @@
 
   var STUDENT_TABS = [
     { label: "Exams", path: "/exams", match: ["/exams", "/session", "/after"] },
-    { label: "Me", path: "/me", match: ["/me", "/survey"] }
+    { label: "Me", path: "/me", match: ["/me", "/classes", "/survey"] }
   ];
   var ADMIN_TABS = [
     { label: "Courses", path: "/admin/courses", match: ["/admin/courses", "/admin/slot"] },
     { label: "Review", path: "/admin/review", match: ["/admin/review"] },
-    { label: "Strikes", path: "/admin/strikes", match: ["/admin/strikes"] },
+    { label: "Misses", path: "/admin/misses", match: ["/admin/misses"] },
     { label: "Metrics", path: "/admin/metrics", match: ["/admin/metrics"] }
   ];
+
+  function brand() {
+    var h = ui().h;
+    return h("span", { class: "brand" }, h("span", { class: "brand-mark", "aria-hidden": "true" }, "S"), "StudyBuddy");
+  }
+
+  // The check-in bar: one per seat whose I'm here is open right now (SB.rules.seatActions decides).
+  // Tapping it checks in and opens that session, where the result is shown.
+  var checkinError = null; // { seatId, text } from the last failed tap
+
+  function checkinBars(state, studentId) {
+    var h = ui().h;
+    var now = SB.clock.now();
+    return state.seats
+      .filter(function (seat) {
+        return seat.studentId === studentId && SB.rules.seatActions(state, now, seat.id).canCheckIn;
+      })
+      .map(function (seat) {
+        var session = state.sessions.find(function (x) { return x.id === seat.sessionId; });
+        var slot = session && state.slots.find(function (x) { return x.id === session.slotId; });
+        if (!slot) return null;
+        var started = SB.clock.toMs(now) >= SB.clock.toMs(slot.start);
+        var spot = session.spot && session.spot !== "To be announced" ? " · " + session.spot : "";
+        var err = checkinError && checkinError.seatId === seat.id ? checkinError.text : null;
+        return h("div", { class: "checkin-bar", role: "region", "aria-label": "Check in" },
+          h("span", { class: "checkin-pulse", "aria-hidden": "true" }),
+          h("div", { class: "checkin-text" },
+            h("div", { class: "checkin-title" },
+              (started ? "Session started " : "Session starts ") + SB.clock.fmt(slot.start, "time")),
+            h("div", { class: "checkin-sub" }, "At the spot? " + slot.place + spot),
+            err ? h("div", { class: "checkin-error", role: "alert" }, err) : null),
+          ui().button("I'm here", function () {
+            var r = SB.store.checkIn(seat.id);
+            checkinError = r.ok ? null : { seatId: seat.id, text: r.error };
+            if (r.ok) go("#/session/" + session.id); else render();
+          }, { kind: "primary", class: "checkin-btn" }));
+      })
+      .filter(Boolean);
+  }
 
   function setMode(mode) {
     var b = document.body;
@@ -207,7 +247,7 @@
         h(
           "header",
           { class: "admin-top" },
-          h("div", { class: "admin-brand" }, "StudyBuddy BYU", h("span", { class: "muted small" }, " · Admin · " + who.user.name)),
+          h("div", { class: "admin-brand" }, brand(), h("span", { class: "muted small" }, "Admin · " + who.user.name)),
           tabBar(ADMIN_TABS, path, "admin-tabs")
         ),
         view
@@ -218,7 +258,8 @@
       shell = h(
         "div",
         { class: "shell shell-student" },
-        h("header", { class: "topbar" }, h("span", { class: "brand" }, "StudyBuddy BYU")),
+        h("header", { class: "topbar" }, brand()),
+        showTabs ? checkinBars(state, who.user.id) : null,
         view,
         showTabs ? tabBar(STUDENT_TABS, path, "tabbar") : null
       );

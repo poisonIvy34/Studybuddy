@@ -38,7 +38,8 @@
       var raw = window.localStorage.getItem(KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        if (parsed && parsed.version === 1 && parsed.demo && parsed.settings) loaded = parsed;
+        // A saved state from an older data shape is dropped for the current seed.
+        if (parsed && parsed.version === SB.seed.version && parsed.demo && parsed.settings) loaded = parsed;
       }
     } catch (e) { loaded = null; }
     state = deepFreeze(loaded || copy(SB.seed));
@@ -103,11 +104,11 @@
     // sign-up
     "saveProfile", "acceptConduct", "submitIntake", "finishPermissions",
     // student
-    "pick", "unpick", "confirm", "cantMakeIt", "cancel", "checkIn", "report", "answerPost", "submitExit", "deleteAccount",
+    "addCourse", "pick", "unpick", "confirm", "cantMakeIt", "cancel", "checkIn", "report", "answerPost", "submitExit", "deleteAccount",
     // notifications
     "markRead",
     // admin
-    "saveCourse", "saveExam", "saveSlot", "setPilotEnd", "decideCheckin", "decideReport", "removeStrike"
+    "saveCourse", "saveExam", "saveSlot", "setPilotEnd", "decideCheckin", "decideReport", "removeMiss"
   ].forEach(function (name) { api[name] = action(name); });
 
   // requestLink only validates; it never changes state, so don't save or notify.

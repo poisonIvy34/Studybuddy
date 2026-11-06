@@ -10,22 +10,29 @@
        slt_stat121_m2_wed   open, 49h out, 4 picks -> locks at 1:00 PM
        slt_chem105_m2_wed   open, 49.5h out, 2 picks -> drops at 1:30 PM
        slt_chem105_m2_thu   open, 8 picks -> splits into two tables of 4 on Tue 4:00 PM
-   - Tyler has 2 strikes, Noah has 1, Ben's check-in is unverified and waiting for review.
+   - Tyler has 2 misses (one per class, both from cycle 1, so both have reset for cycle 2), Noah has 1.
+     Ben's check-in is unverified and waiting for review.
    - Zoe started sign-up but didn't finish. Lily only ever picked a slot that dropped. */
 (function () {
   "use strict";
   var SB = (window.SB = window.SB || {});
 
   function t(dayTime) { return "2026-11-" + dayTime + ":00-07:00"; } // t("16T12:00") -> "2026-11-16T12:00:00-07:00"
-  function allJobs() { return { lowTurnoutSent: true, confirmSent: true, startDone: true, endDone: true }; }
-  function noJobs() { return { lowTurnoutSent: false, confirmSent: false, startDone: false, endDone: false }; }
+  function allJobs() {
+    return { earlyAskSent: true, lowTurnoutSent: true, earlyReleaseDone: true, confirmSent: true,
+      startDone: true, endDone: true, finalDone: true };
+  }
+  // The Mon 4:00 PM session at 12:00 PM: only the T−24h early ask has run (it had no early seats).
+  function todayJobs() {
+    return { earlyAskSent: true, lowTurnoutSent: false, earlyReleaseDone: false, confirmSent: false,
+      startDone: false, endDone: false, finalDone: false };
+  }
 
   function stu(key, first, year, vibe, courseIds, onboarding) {
     return {
       id: "stu_" + key, email: key + "." + first.toLowerCase().charAt(0) + "@byu.edu", // PLACEHOLDER emails
       firstName: first, year: year, vibe: vibe, courseIds: courseIds,
-      onboarding: onboarding || { profile: true, conduct: true, intake: true, permissions: true },
-      pausedUntil: null
+      onboarding: onboarding || { profile: true, conduct: true, intake: true, permissions: true }
     };
   }
   function pick(slotKey, who, at, status) {
@@ -35,7 +42,7 @@
   function seat(sesKey, who, status, confirmedAt, cancelledAt, cancelReason) {
     return { id: "set_" + sesKey + "_" + who, sessionId: "ses_" + sesKey, studentId: "stu_" + who, status: status,
       confirmedAt: confirmedAt ? t(confirmedAt) : null, cancelledAt: cancelledAt ? t(cancelledAt) : null,
-      cancelReason: cancelReason || null };
+      cancelReason: cancelReason || null, earlyConfirm: false };
   }
   function chk(sesKey, who, at, result) {
     return { id: "chk_" + sesKey + "_" + who, seatId: "set_" + sesKey + "_" + who, at: t(at), result: result,
@@ -66,6 +73,10 @@
   var confirmedText = function (when, place, spot, table, mates) {
     return "Session confirmed: " + when + " at " + place + ", " + spot + " (table " + table + "). Your table: " +
       mates + ".";
+  };
+
+  var missText = function (cls) {
+    return "Looks like you missed your " + cls + " session. Life happens! Next time, tapping “Can't make it” lets your group know.";
   };
 
   var notifications = [
@@ -143,7 +154,7 @@
       "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 5."),
     ntf("stu_tyler", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
       "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 5."),
-    // Nov 11 4:30 PM: CHEM Wed ends (Tyler no-show: 1st strike, no notice)
+    // Nov 11 4:30 PM: CHEM Wed ends (Tyler confirmed but never checked in: his miss comes 24h later)
     ntf("stu_hannah", "11T16:30", "post_session", true, "#/after/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
       "How did it go? Tell us whether today's session left you more prepared."),
     ntf("stu_lucia", "11T16:30", "post_session", true, "#/after/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
@@ -159,11 +170,14 @@
       "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, table 3."),
     ntf("stu_noah", "11T18:30", "still_coming", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
       "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, table 3."),
-    // Nov 11 8:30 PM: STAT Wed ends (Tyler 2nd strike -> warning, Noah 1st strike)
-    ntf("stu_tyler", "11T20:30", "strike_warning", false, "#/me", null, null,
-      "You now have 2 strikes for missed sessions. A 3rd strike pauses sign-ups for 14 days."),
+    // Nov 11 8:30 PM: STAT Wed ends
     ntf("stu_jake", "11T20:30", "post_session", true, "#/after/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
       "How did it go? Tell us whether today's session left you more prepared."),
+    // Nov 12 4:30 PM: CHEM Wed's 24h window closes (Tyler's CHEM miss); 8:30 PM: STAT Wed's (Tyler, Noah).
+    // Each is the student's 1st miss in that class, so each gets the gentle notice.
+    ntf("stu_tyler", "12T16:30", "miss_notice", true, "#/me", null, null, missText("CHEM 105")),
+    ntf("stu_tyler", "12T20:30", "miss_notice", false, "#/me", null, null, missText("STAT 121")),
+    ntf("stu_noah", "12T20:30", "miss_notice", false, "#/me", null, null, missText("STAT 121")),
     // Nov 14 4:00 PM: STAT Mon (cycle 2) locks with 3
     ntf("stu_maya", "14T16:00", "session_confirmed", false, "#/session/ses_" + SES_D, "slt_" + S121_M2_MON, "ses_" + SES_D,
       confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Priya, Olivia")),
@@ -174,7 +188,7 @@
   ];
 
   SB.seed = {
-    version: 1,
+    version: 2,
     seq: 100,
     jobs: { surveyOpenSent: false },
     demo: { now: t("16T12:00"), currentUserId: null, location: "in_range", pendingLinkCode: null },
@@ -183,8 +197,8 @@
       pilotEnd: t("30T12:00"), // PLACEHOLDER
       lockHoursBefore: 48, minGroup: 3, maxPerTable: 6,
       lowTurnoutHoursBefore: 3, confirmMinutesBefore: 30, checkInOpensMinutesBefore: 15,
-      checkInRadiusM: 150, postWindowHours: 24,
-      strikeWarnAt: 2, strikePauseAt: 3, strikePauseDays: 14
+      checkInRadiusM: 150, postWindowHours: 24, slotWindowDays: 5,
+      earlyConfirmAfterMisses: 2, earlyConfirmAskHoursBefore: 24, earlyConfirmByHoursBefore: 3
     },
     admins: [
       { id: "adm_ella", name: "Ella Cook", email: "ella.cook@byu.edu" }, // PLACEHOLDER email
@@ -229,12 +243,13 @@
 
     conductText: // PLACEHOLDER
       "StudyBuddy code of conduct\n\n" +
-      "1. Show up when you say you will. If plans change, cancel before the session starts so your table knows.\n" +
+      "1. Show up when you say you will. If plans change, tap Can't make it so your group knows. No hard feelings.\n" +
       "2. Respect your table's type: quiet tables stay quiet, chatty tables keep it about the class.\n" +
       "3. Be kind. No harassment, pressure or unwanted contact, during or after a session.\n" +
       "4. Keep it about studying. No selling, recruiting or dating requests.\n" +
-      "5. Report anything that made you uncomfortable. Reports are private and reviewed within 24 hours.\n\n" +
-      "Missing a session you confirmed earns a strike. Two strikes bring a warning; three pause sign-ups for 14 days.",
+      "5. Report anything that made you feel unsafe or uncomfortable. Reports are private and reviewed within 24 hours.\n\n" +
+      "If you say you're still coming and then don't show, that's a miss. Misses reset each exam. After 2 misses in one " +
+      "exam, you'll confirm a little earlier so your group can count on a full table.",
 
     surveys: { // PLACEHOLDER questions
       intake: [
@@ -329,7 +344,7 @@
       { id: "ses_" + SES_C1, slotId: "slt_" + C105_M1_WED, table: 1, spot: "table 4", jobs: allJobs() },
       { id: "ses_" + SES_C2, slotId: "slt_" + C105_M1_WED, table: 2, spot: "table 5", jobs: allJobs() },
       { id: "ses_" + SES_B, slotId: "slt_" + S121_M1_WED, table: 1, spot: "table 3", jobs: allJobs() },
-      { id: "ses_" + SES_D, slotId: "slt_" + S121_M2_MON, table: 1, spot: "table 12", jobs: noJobs() }
+      { id: "ses_" + SES_D, slotId: "slt_" + S121_M2_MON, table: 1, spot: "table 12", jobs: todayJobs() }
     ],
 
     seats: [
@@ -365,21 +380,24 @@
       chk(SES_B, "jake", "11T18:50", "in_range")
     ],
 
-    strikes: [
-      { id: "stk_tyler_chem", studentId: "stu_tyler", seatId: "set_" + SES_C2 + "_tyler", at: t("11T16:30"), removed: false },
-      { id: "stk_tyler_stat", studentId: "stu_tyler", seatId: "set_" + SES_B + "_tyler", at: t("11T20:30"), removed: false },
-      { id: "stk_noah_stat", studentId: "stu_noah", seatId: "set_" + SES_B + "_noah", at: t("11T20:30"), removed: false }
+    misses: [ // given when each session's 24h window closed (D36)
+      { id: "mis_tyler_chem", studentId: "stu_tyler", seatId: "set_" + SES_C2 + "_tyler", examId: "exm_chem105_m1",
+        at: t("12T16:30"), removed: false },
+      { id: "mis_tyler_stat", studentId: "stu_tyler", seatId: "set_" + SES_B + "_tyler", examId: "exm_stat121_m1",
+        at: t("12T20:30"), removed: false },
+      { id: "mis_noah_stat", studentId: "stu_noah", seatId: "set_" + SES_B + "_noah", examId: "exm_stat121_m1",
+        at: t("12T20:30"), removed: false }
     ],
     reports: [],
 
     postAnswers: [
-      { seatId: "set_" + SES_A + "_maya", answer: "more", at: t("10T18:00") },
-      { seatId: "set_" + SES_A + "_priya", answer: "same", at: t("10T19:00") },
-      { seatId: "set_" + SES_C1 + "_hannah", answer: "more", at: t("11T17:00") },
-      { seatId: "set_" + SES_C1 + "_lucia", answer: "more", at: t("11T17:10") },
-      { seatId: "set_" + SES_C1 + "_ben", answer: "same", at: t("11T17:30") },
-      { seatId: "set_" + SES_C2 + "_kai", answer: "same", at: t("11T18:00") },
-      { seatId: "set_" + SES_B + "_jake", answer: "less", at: t("11T21:00") }
+      { seatId: "set_" + SES_A + "_maya", answer: "more", studiedWith: ["stu_priya", "stu_olivia"], at: t("10T18:00") },
+      { seatId: "set_" + SES_A + "_priya", answer: "same", studiedWith: ["stu_maya", "stu_olivia"], at: t("10T19:00") },
+      { seatId: "set_" + SES_C1 + "_hannah", answer: "more", studiedWith: ["stu_lucia"], at: t("11T17:00") }, // not Ben: rejecting his check-in still demos a miss
+      { seatId: "set_" + SES_C1 + "_lucia", answer: "more", studiedWith: ["stu_hannah"], at: t("11T17:10") },
+      { seatId: "set_" + SES_C1 + "_ben", answer: "same", studiedWith: [], at: t("11T17:30") },
+      { seatId: "set_" + SES_C2 + "_kai", answer: "same", studiedWith: [], at: t("11T18:00") },
+      { seatId: "set_" + SES_B + "_jake", answer: "less", studiedWith: [], at: t("11T21:00") }
     ],
     surveyAnswers: [
       intake("maya", "no", 4, "3–5", "02T10:00"),

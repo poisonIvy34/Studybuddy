@@ -14,7 +14,7 @@
 </style>
 </head>
 <body>
-<h1>StudyBuddy BYU — rule checks</h1>
+<h1>StudyBuddy — rule checks</h1>
 <div id="summary">Running…</div>
 <div id="out"></div>
 
@@ -60,10 +60,10 @@
     st.courses = [{ id: "crs_x", name: "TEST 101: Fixture", section: "001", linkCode: "test-001", enrolled: 50 }];
     st.exams = [{ id: "exm_x", courseId: "crs_x", name: "Exam", at: T("20T10:00") }];
     st.slots = []; st.students = []; st.picks = []; st.sessions = []; st.seats = []; st.checkins = [];
-    st.strikes = []; st.reports = []; st.postAnswers = []; st.surveyAnswers = []; st.notifications = [];
+    st.misses = []; st.reports = []; st.postAnswers = []; st.surveyAnswers = []; st.notifications = [];
     for (var i = 1; i <= (nStudents || 12); i++) {
       st.students.push({ id: "stu_" + i, email: "s" + i + "@byu.edu", firstName: "S" + i, year: "Junior", vibe: "quiet",
-        courseIds: ["crs_x"], onboarding: { profile: true, conduct: true, intake: true, permissions: true }, pausedUntil: null });
+        courseIds: ["crs_x"], onboarding: { profile: true, conduct: true, intake: true, permissions: true } });
     }
     return st;
   }
@@ -103,8 +103,8 @@
   section("Seed shape and consistency");
   safe("seed", function () {
     var s = SB.seed;
-    check("seed has version 1 and every top-level field", s.version === 1 && ["seq", "jobs", "demo", "settings", "admins",
-      "courses", "exams", "slots", "conductText", "surveys", "students", "picks", "sessions", "seats", "checkins", "strikes",
+    check("seed has version 2 and every top-level field", s.version === 2 && ["seq", "jobs", "demo", "settings", "admins",
+      "courses", "exams", "slots", "conductText", "surveys", "students", "picks", "sessions", "seats", "checkins", "misses",
       "reports", "postAnswers", "surveyAnswers", "notifications"].every(function (k) { return k in s; }));
     eq("demo.currentUserId and pendingLinkCode are null", [s.demo.currentUserId, s.demo.pendingLinkCode], [null, null]);
     check("2-3 courses, each with 2 exams", s.courses.length >= 2 && s.courses.length <= 3 && s.courses.every(function (c) {
@@ -122,7 +122,7 @@
     check("every seeded time is in November 2026 at -07:00", bad.length === 0, bad.join(", "));
 
     var prefixes = { students: "stu_", admins: "adm_", courses: "crs_", exams: "exm_", slots: "slt_", picks: "pck_",
-      sessions: "ses_", seats: "set_", checkins: "chk_", strikes: "stk_", reports: "rpt_", notifications: "ntf_" };
+      sessions: "ses_", seats: "set_", checkins: "chk_", misses: "mis_", reports: "rpt_", notifications: "ntf_" };
     var badIds = [], allIds = {};
     Object.keys(prefixes).forEach(function (k) {
       s[k].forEach(function (r) {
@@ -138,8 +138,8 @@
 
     check("every attended seat has a valid check-in", s.seats.filter(function (x) { return x.status === "attended"; })
       .every(function (x) { return s.checkins.some(function (c) { return c.seatId === x.id && (c.result === "in_range" || c.result === "unverified"); }); }));
-    check("every no_show seat has a strike (or a removed one)", s.seats.filter(function (x) { return x.status === "no_show"; })
-      .every(function (x) { return s.strikes.some(function (k) { return k.seatId === x.id; }); }));
+    check("every no_show seat has a miss (or a removed one)", s.seats.filter(function (x) { return x.status === "no_show"; })
+      .every(function (x) { return s.misses.some(function (k) { return k.seatId === x.id; }); }));
     check("every placed pick has a seat", s.picks.filter(function (p) { return p.status === "placed"; }).every(function (p) {
       return seatsOf(s, p.slotId, p.studentId).length === 1; }));
     check("every seat has a placed pick", s.seats.every(function (x) {
@@ -153,10 +153,10 @@
         if (sl.status === "open") return ps.every(function (p) { return p.status === "active" || p.status === "removed"; });
         return ps.every(function (p) { return p.status === "placed"; });
       }));
-    check("references resolve (seats, check-ins, strikes, post answers)",
+    check("references resolve (seats, check-ins, misses, post answers)",
       s.seats.every(function (x) { return byId(s.sessions, x.sessionId) && byId(s.students, x.studentId); }) &&
       s.checkins.every(function (c) { return byId(s.seats, c.seatId); }) &&
-      s.strikes.every(function (k) { return byId(s.seats, k.seatId) && byId(s.students, k.studentId); }) &&
+      s.misses.every(function (k) { return byId(s.seats, k.seatId) && byId(s.students, k.studentId) && byId(s.exams, k.examId); }) &&
       s.postAnswers.every(function (a) { return byId(s.seats, a.seatId); }));
     check("one question per survey has isConnection", ["intake", "exit"].every(function (k) {
       return s.surveys[k].filter(function (q) { return q.isConnection; }).length === 1; }));
@@ -183,9 +183,14 @@
       return all.length >= 3 && all.filter(function (x) { return x.status === "cancelled"; }).length === all.length - 2;
     })());
     var counts = {};
-    s.strikes.forEach(function (k) { if (!k.removed) counts[k.studentId] = (counts[k.studentId] || 0) + 1; });
+    s.misses.forEach(function (k) { if (!k.removed) counts[k.studentId] = (counts[k.studentId] || 0) + 1; });
     var vals = Object.keys(counts).map(function (k) { return counts[k]; });
-    check("one student with 1 strike and one with 2", vals.indexOf(1) >= 0 && vals.indexOf(2) >= 0, JSON.stringify(counts));
+    check("one student with 1 miss and one with 2", vals.indexOf(1) >= 0 && vals.indexOf(2) >= 0, JSON.stringify(counts));
+    check("every studiedWith names a tablemate", s.postAnswers.every(function (a) {
+      var by = byId(s.seats, a.seatId);
+      return (a.studiedWith || []).every(function (id) {
+        return id !== by.studentId && s.seats.some(function (x) { return x.sessionId === by.sessionId && x.studentId === id; }); });
+    }));
     check("an unverified check-in waiting for review", s.checkins.some(function (c) { return c.result === "unverified" && c.adminDecision === null; }));
     check("some sessions are in the past", s.sessions.some(function (ses) { return C.toMs(byId(s.slots, ses.slotId).end) < now; }));
   });
@@ -374,14 +379,14 @@
     st = run(R.cancel(st, T("12T10:00"), "stu_1", sid(st, 1)));
     st = R.tick(st, T("13T12:00"));
     var x = seatOf(st, "slt_s", "stu_1");
-    eq("cancelled before start -> cancelled, no strike", [x.status, x.cancelReason, st.strikes.length], ["cancelled", "student", 0]);
+    eq("cancelled before start -> cancelled, no miss", [x.status, x.cancelReason, st.misses.length], ["cancelled", "student", 0]);
   });
   safe("cantMakeIt", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
     st = run(R.cantMakeIt(st, addM(S_START, -20), "stu_1", sid(st, 1)));
     st = R.tick(st, T("13T12:00"));
     var x = seatOf(st, "slt_s", "stu_1");
-    eq("Can't make it -> cancelled (cant_make_it), no strike (TC9)", [x.status, x.cancelReason, st.strikes.length], ["cancelled", "cant_make_it", 0]);
+    eq("Can't make it -> cancelled (cant_make_it), no miss (TC9)", [x.status, x.cancelReason, st.misses.length], ["cancelled", "cant_make_it", 0]);
   });
   safe("D1", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
@@ -391,7 +396,7 @@
     st = R.tick(st, S_START);
     eq("D1: unanswered -> released at T", seatOf(st, "slt_s", "stu_1").status, "released");
     st = R.tick(st, T("13T12:00"));
-    eq("D1: released gets no strike", st.strikes.length, 0);
+    eq("D1: released gets no miss", st.misses.length, 0);
   });
   safe("attended", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
@@ -400,18 +405,66 @@
     st = run(R.checkIn(st, addM(S_START, -5), "stu_1", sid(st, 1)));
     st = R.tick(st, T("13T12:00"));
     var x = seatOf(st, "slt_s", "stu_1");
-    eq("confirmed + checked in -> attended, no strike", [x.status, x.confirmedAt, st.strikes.length], ["attended", addM(S_START, -25), 0]);
+    eq("confirmed + checked in -> attended, no miss", [x.status, x.confirmedAt, st.misses.length], ["attended", addM(S_START, -25), 0]);
     eq("check-in result in_range", st.checkins[0].result, "in_range");
   });
+  var S_FINAL = C.add(S_END, { hours: 24 });
   safe("noShow", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
     st = run(R.confirm(st, addM(S_START, -25), "stu_1", sid(st, 1)));
-    var mid = R.tick(st, addM(S_END, -1));
-    eq("confirmed seat stays confirmed until End", seatOf(mid, "slt_s", "stu_1").status, "confirmed");
-    st = R.tick(st, S_END);
+    var mid = R.tick(st, addM(S_FINAL, -1));
+    eq("D36: confirmed seat stays confirmed through End+24h (a tablemate may still name them)",
+      [seatOf(mid, "slt_s", "stu_1").status, mid.misses.length], ["confirmed", 0]);
+    st = R.tick(st, S_FINAL);
     var x = seatOf(st, "slt_s", "stu_1");
-    eq("confirmed, no check-in -> no_show at End", x.status, "no_show");
-    eq("...with one strike at End", st.strikes.map(function (k) { return [k.studentId, k.seatId, k.at]; }), [["stu_1", x.id, S_END]]);
+    eq("confirmed, never seen -> no_show at End+24h", x.status, "no_show");
+    eq("...with one miss at End+24h, tied to the exam", st.misses.map(function (k) { return [k.studentId, k.seatId, k.examId, k.at]; }),
+      [["stu_1", x.id, "exm_x", S_FINAL]]);
+  });
+  safe("D36", function () {
+    var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
+    st = run(R.confirm(st, addM(S_START, -25), "stu_1", sid(st, 1)));
+    st = run(R.confirm(st, addM(S_START, -25), "stu_2", sid(st, 2)));
+    st = run(R.cancel(st, addM(S_START, -20), "stu_3", sid(st, 3)));
+    st.demo.location = "in_range";
+    st = run(R.checkIn(st, addM(S_START, -5), "stu_1", sid(st, 1)));
+    st = R.tick(st, S_END);
+    var a = run(R.answerPost(st, addM(S_END, 10), "stu_1", sid(st, 1), "more", ["stu_2", "stu_3"]));
+    eq("D36: a tablemate naming you makes your confirmed seat attended", seatOf(a, "slt_s", "stu_2").status, "attended");
+    eq("D36: naming someone who cancelled changes nothing", seatOf(a, "slt_s", "stu_3").status, "cancelled");
+    eq("D36: the named student gets the post-session question", notes(a, "post_session", "stu_2").length, 1);
+    check("D36: they can answer it", R.postOpen(a, addM(S_END, 20), sid(a, 2)));
+    a = R.tick(a, S_FINAL);
+    eq("D36: no miss for a student a tablemate named", [seatOf(a, "slt_s", "stu_2").status, a.misses.length], ["attended", 0]);
+    eq("D36: show-up counts a tablemate's acknowledgment", [R.metrics(a).overall.showUpRate.num, R.metrics(a).overall.showUpRate.den], [2, 2]);
+    var none = R.tick(run(R.answerPost(st, addM(S_END, 10), "stu_1", sid(st, 1), "more", [])), S_FINAL);
+    eq("D36: nobody is asked about absence: no names -> the unseen seat is a miss", [seatOf(none, "slt_s", "stu_2").status, none.misses.length], ["no_show", 1]);
+    check("D36: can't name yourself", !!R.answerPost(st, addM(S_END, 10), "stu_1", sid(st, 1), "more", ["stu_1"]).error);
+    var other = fixture(); addSlot(other, "slt_s", S_START, { spots: ["a", "b"] }); addPicks(other, "slt_s", 8);
+    other = R.tick(other, addM(S_START, -10)); other.demo.location = "in_range";
+    other = run(R.checkIn(other, addM(S_START, -10), "stu_1", seatOf(other, "slt_s", "stu_1").id));
+    other = R.tick(other, S_END);
+    check("D36: can't name someone at another table", !!R.answerPost(other, addM(S_END, 1), "stu_1", seatOf(other, "slt_s", "stu_1").id, "same", ["stu_8"]).error);
+    // An unverified check-in a tablemate vouched for stays attended when rejected.
+    var u = lockedFixture(4); u = R.tick(u, addM(S_START, -30));
+    u.demo.location = "in_range"; u = run(R.checkIn(u, addM(S_START, -5), "stu_1", sid(u, 1)));
+    u.demo.location = "denied"; u = run(R.checkIn(u, addM(S_START, -5), "stu_2", sid(u, 2)));
+    u = R.tick(u, S_END);
+    u = run(R.answerPost(u, addM(S_END, 1), "stu_1", sid(u, 1), "same", ["stu_2"]));
+    var chk = u.checkins.filter(function (c) { return c.result === "unverified"; })[0];
+    var rej = run(R.decideCheckin(u, addM(S_END, 60), "adm_ella", chk.id, "rejected"));
+    eq("D36: rejecting a check-in a tablemate vouched for gives no miss", [seatOf(rej, "slt_s", "stu_2").status, rej.misses.length], ["attended", 0]);
+  });
+  safe("D40", function () {
+    var st = lockedFixture(4);
+    st = run(R.cancel(st, T("12T10:00"), "stu_1", sid(st, 1)));
+    var m = notes(st, "mate_cancelled");
+    eq("D40: backing out tells everyone still at the table", m.map(function (n) { return n.to; }).sort(), ["stu_2", "stu_3", "stu_4"]);
+    check("D40: by first name, without blame", /^S1 can't make it/.test(m[0].text) && !/miss|strike/i.test(m[0].text), m[0].text);
+    st = R.tick(st, addM(S_START, -30));
+    st = run(R.cantMakeIt(st, addM(S_START, -20), "stu_2", sid(st, 2)));
+    eq("D40: Can't make it tells the rest (not the one who already left)", notes(st, "mate_cancelled").filter(function (n) {
+      return /^S2/.test(n.text); }).map(function (n) { return n.to; }).sort(), ["stu_3", "stu_4"]);
   });
   safe("unverified", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
@@ -420,13 +473,13 @@
     st = run(R.checkIn(st, addM(S_START, 5), "stu_1", sid(st, 1)));
     st = R.tick(st, S_END);
     var x = seatOf(st, "slt_s", "stu_1");
-    eq("location denied -> attended, check-in unverified, no strike", [x.status, st.checkins[0].result, st.checkins[0].adminDecision, st.strikes.length],
+    eq("location denied -> attended, check-in unverified, no miss", [x.status, st.checkins[0].result, st.checkins[0].adminDecision, st.misses.length],
       ["attended", "unverified", null, 0]);
     var acc = run(R.decideCheckin(st, T("13T09:00"), "adm_ella", st.checkins[0].id, "accepted"));
-    eq("D11: accepted -> stays attended, no strike", [seatOf(acc, "slt_s", "stu_1").status, acc.strikes.length], ["attended", 0]);
+    eq("D11: accepted -> stays attended, no miss", [seatOf(acc, "slt_s", "stu_1").status, acc.misses.length], ["attended", 0]);
     var rej = run(R.decideCheckin(st, T("13T09:00"), "adm_ash", st.checkins[0].id, "rejected"));
-    eq("D11: rejected -> no_show with a strike", [seatOf(rej, "slt_s", "stu_1").status, rej.strikes.length], ["no_show", 1]);
-    eq("D23: the strike is dated at the decision time", rej.strikes[0].at, T("13T09:00"));
+    eq("D11: rejected -> no_show with a miss", [seatOf(rej, "slt_s", "stu_1").status, rej.misses.length], ["no_show", 1]);
+    eq("the miss is dated at the decision time", rej.misses[0].at, T("13T09:00"));
     check("a student can't decide check-ins", !!R.decideCheckin(st, T("13T09:00"), "stu_2", st.checkins[0].id, "rejected").error);
     check("a decided check-in can't be decided again", !!R.decideCheckin(rej, T("13T10:00"), "adm_ella", st.checkins[0].id, "accepted").error);
     var vs = R.metrics(st).overall.showUpRate;
@@ -447,8 +500,8 @@
     only = run(R.confirm(only, addM(S_START, -25), "stu_1", sid(only, 1)));
     only.demo.location = "out_of_range";
     only = run(R.checkIn(only, addM(S_START, -10), "stu_1", sid(only, 1)));
-    only = R.tick(only, S_END);
-    eq("only out_of_range attempts -> no_show + strike", [seatOf(only, "slt_s", "stu_1").status, only.strikes.length], ["no_show", 1]);
+    only = R.tick(only, S_FINAL);
+    eq("only out_of_range attempts -> no_show + miss", [seatOf(only, "slt_s", "stu_1").status, only.misses.length], ["no_show", 1]);
   });
   safe("D18", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
@@ -534,77 +587,87 @@
     check("can't answer twice", !!R.answerPost(a, addM(S_END, 6), "stu_1", sid(st, 1), "less").error);
   });
 
-  // ================= STRIKES =================
-  section("Strikes: warning, pause (D8, D22, D23)");
-  // Student 1 confirms and no-shows `n` sessions; returns state after the last End.
+  // ================= MISSES =================
+  section("Misses: gentle notice, per-class fresh start, confirm early, no pause (D37–D39)");
+  // Student 1 confirms each slot at T-30m and never shows; returns state after each slot's End+24h.
   function noShows(st, slots) {
     slots.forEach(function (id) {
       var slot = byId(st.slots, id);
       st = R.tick(st, addM(slot.start, -30));
       var x = seatOf(st, id, "stu_1");
       st = run(R.confirm(st, addM(slot.start, -30), "stu_1", x.id));
-      st = R.tick(st, slot.end);
+      st = R.tick(st, C.add(slot.end, { hours: 24 }));
     });
     return st;
   }
-  safe("strikes", function () {
+  safe("misses", function () {
     var st = fixture();
-    addSlot(st, "slt_1", T("12T10:00")); addSlot(st, "slt_2", T("12T13:00")); addSlot(st, "slt_3", T("12T16:00"));
-    addSlot(st, "slt_in", T("14T10:00"));   // locked session inside the pause
-    addSlot(st, "slt_open", T("25T10:00")); // open slot inside the pause (exam moved to Dec for this check)
-    addSlot(st, "slt_late", T("28T12:00"));
     st.exams[0].at = "2026-12-20T10:00:00-07:00";
-    ["slt_1", "slt_2", "slt_3", "slt_in"].forEach(function (id) { addPicks(st, id, [1, 2, 3]); });
-    addPicks(st, "slt_open", [1]); addPicks(st, "slt_late", [1]);
-    st = R.tick(st, T("12T09:00"));
-    var one = noShows(st, ["slt_1"]);
-    eq("1st strike: no warning", [R.activeStrikes(one, "stu_1"), notes(one, "strike_warning").length], [1, 0]);
-    var two = noShows(one, ["slt_2"]);
-    eq("2nd strike: one strike_warning", [R.activeStrikes(two, "stu_1"), notes(two, "strike_warning", "stu_1").length], [2, 1]);
-    var three = noShows(two, ["slt_3"]);
-    var stu = byId(three.students, "stu_1"), end3 = byId(three.slots, "slt_3").end;
-    eq("3rd strike: pause starts at the session End, for 14 days (D23)", stu.pausedUntil, C.add(end3, { days: 14 }));
-    eq("3rd strike: no second warning", notes(three, "strike_warning", "stu_1").length, 1);
-    eq("one strike_pause notification", notes(three, "strike_pause", "stu_1").length, 1);
-    check("isPaused true; canPick false", R.isPaused(three, T("13T09:00"), "stu_1") && !R.canPick(three, T("13T09:00"), "stu_1", "slt_late"));
-    check("pick is rejected with a message while paused", /paused/i.test(R.pick(three, T("13T09:00"), "stu_1", "slt_late").error || ""));
-    var inSeat = seatOf(three, "slt_in", "stu_1");
-    eq("D8: placed seat in the pause is cancelled (strike_pause)", [inSeat.status, inSeat.cancelReason], ["cancelled", "strike_pause"]);
-    var po = three.picks.filter(function (p) { return p.studentId === "stu_1" && p.slotId === "slt_open"; })[0];
-    eq("D8: active pick on a slot in the pause is removed (strike_pause)", [po.status, po.removedReason], ["removed", "strike_pause"]);
-    eq("slots after the pause are kept", three.picks.filter(function (p) { return p.studentId === "stu_1" && p.slotId === "slt_late"; })[0].status, "active");
-    eq("isPaused ends at pausedUntil", R.isPaused(three, stu.pausedUntil, "stu_1"), false);
-
-    var lifted = run(R.removeStrike(three, T("13T09:00"), "adm_ella", three.strikes[0].id));
-    eq("D22: removing a strike below 3 lifts the pause", [byId(lifted.students, "stu_1").pausedUntil, R.activeStrikes(lifted, "stu_1")], [null, 2]);
-    eq("D22: cancelled seats and removed picks stay that way", [seatOf(lifted, "slt_in", "stu_1").status,
-      lifted.picks.filter(function (p) { return p.slotId === "slt_open" && p.studentId === "stu_1"; })[0].status], ["cancelled", "removed"]);
-    check("a student can't remove strikes", !!R.removeStrike(three, T("13T09:00"), "stu_2", three.strikes[0].id).error);
-    var rm = run(R.removeStrike(two, T("12T15:00"), "adm_ash", two.strikes[0].id));
-    eq("removed strikes don't count", R.activeStrikes(rm, "stu_1"), 1);
-  });
-  safe("pauseByRejection", function () {
-    var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
-    st.strikes.push({ id: "stk_a", studentId: "stu_1", seatId: "set_x", at: T("01T10:00"), removed: false },
-                    { id: "stk_b", studentId: "stu_1", seatId: "set_y", at: T("02T10:00"), removed: false });
-    st.demo.location = "denied";
-    st = run(R.checkIn(st, addM(S_START, -10), "stu_1", sid(st, 1)));
-    st = R.tick(st, S_END);
-    var rej = run(R.decideCheckin(st, T("14T08:00"), "adm_ella", st.checkins[0].id, "rejected"));
-    eq("D23: a rejection that is the 3rd strike pauses from the decision time", byId(rej.students, "stu_1").pausedUntil, C.add(T("14T08:00"), { days: 14 }));
-  });
-  safe("pauseTieOrder", function () {
-    // End of a session (3rd strike) at the same instant as another slot's lock: the strike settles first.
-    var st = fixture();
-    addSlot(st, "slt_1", T("10T10:00")); addSlot(st, "slt_2", T("10T12:00")); addSlot(st, "slt_3", T("10T14:00"));
-    st.demo.now = T("08T00:00");
+    st.exams.push({ id: "exm_y", courseId: "crs_x", name: "Final", at: "2026-12-30T10:00:00-07:00" });
+    st.courses.push({ id: "crs_z", name: "OTHER 200", section: "001", linkCode: "other-001", enrolled: 10 });
+    addSlot(st, "slt_1", T("12T10:00")); addSlot(st, "slt_2", T("13T13:00")); // each after the last miss is final
+    addSlot(st, "slt_3", T("17T12:00"));   // locks Nov 15 12:00, after both misses are final
+    addSlot(st, "slt_late", T("28T12:00"));
     ["slt_1", "slt_2", "slt_3"].forEach(function (id) { addPicks(st, id, [1, 2, 3]); });
-    addSlot(st, "slt_lock", C.add(T("10T15:30"), { hours: 48 })); // locks at slt_3's End
-    addPicks(st, "slt_lock", [1, 4, 5, 6]);
+    addPicks(st, "slt_late", [2]);
+    st = R.tick(st, T("12T09:00"));
+
+    var one = noShows(st, ["slt_1"]);
+    var n1 = notes(one, "miss_notice", "stu_1");
+    eq("1st miss: one private miss_notice", [one.misses.length, n1.length, n1[0] && n1[0].route], [1, 1, "#/me"]);
+    check("1st miss notice is gentle and names the class", /Life happens/.test(n1[0].text) && /TEST 101/.test(n1[0].text) &&
+      !/strike|pause/i.test(n1[0].text), n1[0].text);
+    var two = noShows(one, ["slt_2"]);
+    var n2 = notes(two, "miss_notice", "stu_1");
+    eq("2nd miss: recentMisses is 2", R.recentMisses(two, T("14T15:00"), "stu_1", "crs_x"), 2);
+    check("2nd miss notice explains confirming early", n2.length === 2 && /confirm by 3 hours/.test(n2[1].text), n2[1] && n2[1].text);
+    check("D38: no pause: picking still works after 2 misses", R.canPick(two, T("14T15:00"), "stu_1", "slt_late") &&
+      !R.pick(two, T("14T15:00"), "stu_1", "slt_late").error);
+    eq("D38: reliability counts promises kept", R.reliability(two, "stu_1"), { shownUp: 0, promised: 2 });
+    eq("D37: misses are per class", R.recentMisses(two, T("14T15:00"), "stu_1", "crs_z"), 0);
+    eq("D37: isRecentMiss matches the reset", [R.isRecentMiss(two, T("14T15:00"), two.misses[0].id),
+      R.isRecentMiss(two, "2026-12-25T10:00:00-07:00", two.misses[0].id)], [true, false]);
+    var seedMisses = SB.seed.misses.map(function (k) { return R.isRecentMiss(SB.seed, SB.seed.demo.now, k.id); });
+    eq("D37: the seed's cycle-1 misses have all reset by Nov 16", seedMisses, [false, false, false]);
+    eq("D37: they reset when the next exam's study window opens (Dec 25 10:00)",
+      [R.recentMisses(two, "2026-12-25T09:59:00-07:00", "stu_1", "crs_x"), R.recentMisses(two, "2026-12-25T10:00:00-07:00", "stu_1", "crs_x")], [2, 0]);
+
+    // Lock of slt_3: stu_1 must confirm early, stu_2 doesn't
+    var L = R.tick(two, T("15T12:00"));
+    var s1 = seatOf(L, "slt_3", "stu_1"), s2 = seatOf(L, "slt_3", "stu_2");
+    eq("D39: earlyConfirm is fixed at lock from recent misses", [s1.earlyConfirm, s2.earlyConfirm], [true, false]);
+    check("D39: their session_confirmed asks them to confirm early",
+      /Still coming by Tue, Nov 17 · 9:00 AM/.test(notes(L, "session_confirmed", "stu_1").filter(function (n) { return n.slotId === "slt_3"; })[0].text));
+    var T3 = T("17T12:00");
+    function A(m, s, id) { return R.seatActions(s, addM(T3, m), id); }
+    eq("D39: early seat can confirm from lock until T-3h", [A(-47 * 60, L, s1.id).canConfirm, A(-181, L, s1.id).canConfirm, A(-180, L, s1.id).canConfirm],
+      [true, true, false]);
+    eq("D39: a normal seat still waits for T-30m", [A(-181, L, s2.id).canConfirm, A(-30, L, s2.id).canConfirm], [false, true]);
+    var ask = R.tick(L, addM(T3, -24 * 60));
+    eq("D39: Still coming? goes to the early seat at T-24h only", notes(ask, "still_coming").filter(function (n) { return n.slotId === "slt_3"; })
+      .map(function (n) { return [n.to, n.at]; }), [["stu_1", addM(T3, -24 * 60)]]);
+    var rel = R.tick(ask, addM(T3, -180));
+    eq("D39: no answer by T-3h -> released, no miss", [seatOf(rel, "slt_3", "stu_1").status, rel.misses.length], ["released", 2]);
+    eq("D39: the normal seat isn't released early", seatOf(rel, "slt_3", "stu_2").status, "placed");
+    var kept = run(R.confirm(ask, addM(T3, -300), "stu_1", s1.id));
+    eq("D39: confirming in time keeps the seat", seatOf(R.tick(kept, addM(T3, -180)), "slt_3", "stu_1").status, "confirmed");
+
+    var rm = run(R.removeMiss(two, T("14T16:00"), "adm_ella", two.misses[0].id));
+    eq("an admin can remove a miss; it stops counting", [R.recentMisses(rm, T("14T16:00"), "stu_1", "crs_x"), R.reliability(rm, "stu_1").promised], [1, 1]);
+    check("a student can't remove misses", !!R.removeMiss(two, T("14T16:00"), "stu_2", two.misses[0].id).error);
+    check("a removed miss can't be removed again", !!R.removeMiss(rm, T("14T16:00"), "adm_ash", two.misses[0].id).error);
+  });
+  safe("missTieOrder", function () {
+    // The 2nd miss becomes final at the same instant another slot locks: the miss settles first.
+    var st = fixture();
+    addSlot(st, "slt_1", T("10T10:00")); addSlot(st, "slt_2", T("11T12:00"));
+    st.demo.now = T("08T00:00");
+    ["slt_1", "slt_2"].forEach(function (id) { addPicks(st, id, [1, 2, 3]); });
+    addSlot(st, "slt_lock", C.add(T("12T13:30"), { hours: 48 })); // locks at slt_2 End+24h
+    addPicks(st, "slt_lock", [1, 4, 5]);
     st = R.tick(st, T("10T09:00"));
-    st = noShows(st, ["slt_1", "slt_2", "slt_3"]);
-    eq("tie order: End before Lock, so a paused student's pick is removed before the slot locks",
-      [seatsOf(st, "slt_lock", "stu_1").length, seatsOf(st, "slt_lock").length], [0, 3]);
+    st = noShows(st, ["slt_1", "slt_2"]);
+    eq("tie order: Final before Lock, so the lock sees both misses", seatOf(st, "slt_lock", "stu_1").earlyConfirm, true);
   });
 
   // ================= TICK =================
@@ -719,6 +782,12 @@
     check("D34: signing in with no course link is allowed", !R.openLink(s, now, null, "solo@byu.edu").error);
     var solo = run(R.openLink(s, now, null, "solo@byu.edu"));
     eq("D34: examsFor flags noCourses", R.examsFor(solo, now, solo.demo.currentUserId).noCourses, true);
+    var added = run(R.addCourse(solo, now, solo.demo.currentUserId, "crs_stat121"));
+    eq("D35: addCourse adds a class without its link", byId(added.students, solo.demo.currentUserId).courseIds, ["crs_stat121"]);
+    check("D35: adding the same class twice is rejected", /already/.test(R.addCourse(added, now, solo.demo.currentUserId, "crs_stat121").error || ""));
+    check("D35: an unknown class is rejected", !!R.addCourse(solo, now, solo.demo.currentUserId, "crs_nope").error);
+    check("D35: admins and signed-out users can't add classes",
+      !!R.addCourse(s, now, "adm_ella", "crs_stat121").error && !!R.addCourse(s, now, null, "crs_stat121").error);
   });
   safe("exit", function () {
     var s = SB.seed, u = "stu_maya";
@@ -739,8 +808,8 @@
     st.reports.push({ id: "rpt_t2", sessionId: "ses_chem105_m1_wed_2", byStudentId: u, aboutStudentId: "stu_kai", text: "", at: T("11T17:00"), adminDecision: null });
     var mySeats = st.seats.filter(function (x) { return x.studentId === u; }).map(function (x) { return x.id; });
     var d = run(R.deleteAccount(st, s.demo.now, u));
-    var txt = JSON.stringify([d.students, d.picks, d.seats, d.strikes, d.reports, d.surveyAnswers, d.notifications.map(function (n) { return n.to; })]);
-    check("delete removes the student, picks, seats, strikes, reports, survey answers, notifications", txt.indexOf(u) < 0, txt.indexOf(u));
+    var txt = JSON.stringify([d.students, d.picks, d.seats, d.misses, d.reports, d.surveyAnswers, d.notifications.map(function (n) { return n.to; })]);
+    check("delete removes the student, picks, seats, misses, reports, survey answers, notifications", txt.indexOf(u) < 0, txt.indexOf(u));
     check("delete removes check-ins and post answers for their seats", d.checkins.concat(d.postAnswers).every(function (c) { return mySeats.indexOf(c.seatId) < 0; }));
     eq("sessions stay; user signed out", [d.sessions.length, d.demo.currentUserId], [s.sessions.length, null]);
     check("tablemates stop seeing them", R.tablemates(d, s.demo.now, "set_chem105_m1_wed_2_kai").every(function (m) { return m.studentId !== u; }));
@@ -756,7 +825,7 @@
       { studentId: "stu_lucia", firstName: "Lucia", year: "Sophomore" },
       { studentId: "stu_ben", firstName: "Ben", year: "Junior" },
       { studentId: "stu_grace", firstName: "Grace", year: "Junior" }]);
-    eq("tablemates never include email or strikes", tm.every(function (m) { return Object.keys(m).join() === "studentId,firstName,year"; }), true);
+    eq("tablemates never include email or misses", tm.every(function (m) { return Object.keys(m).join() === "studentId,firstName,year"; }), true);
     var ex = R.examsFor(s, s.demo.now, "stu_maya");
     eq("exams shown until their time, sorted", ex.exams.map(function (e) { return e.exam.id; }), ["exm_stat121_m2", "exm_chem105_m2"]);
     var slotIds = ex.exams[0].slots.map(function (x) { return x.slot.id; });
