@@ -42,7 +42,7 @@ function createPrepdSurvey() {
   choice('What are you using to test Prepd?', ['Phone', 'Laptop or computer', 'Tablet']);
 
   page('Step 1: Sign up', [
-    'Open the Prepd link you were sent.',
+    'Open Prepd: https://poisonivy34.github.io/Studybuddy/ (in a new tab, or on your phone).',
     'Type any made-up email ending in @byu.edu (for example, yourname@byu.edu) and tap "Email me a sign-in link."',
     'Tap "Open link (demo)," then finish the 4 sign-up screens.',
     'Come back here and answer the questions below.'

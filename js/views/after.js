@@ -37,9 +37,8 @@
 
   function sessionHeader(h, state, session) {
     var slot = find(state.slots, session.slotId);
-    var exam = slot ? find(state.exams, slot.examId) : null;
-    var course = exam ? find(state.courses, exam.courseId) : null;
-    var title = (course ? course.name.split(":")[0] + " " : "") + (exam ? exam.name : "Study session");
+    var course = slot ? find(state.courses, slot.courseId) : null;
+    var title = (course ? course.name.split(":")[0] + " " : "") + "study session";
     return h("div", { class: "v-after-head" },
       h("div", { class: "section-title" }, "Study session"),
       h("h1", null, title),
@@ -51,14 +50,14 @@
 
   function nextExamCard(h) {
     return h("div", { class: "card highlight v-after-next" },
-      h("div", { class: "card-title" }, "Pick times for your next exam"),
-      h("p", { class: "muted small" }, "Study sessions fill up before they lock, 48 hours ahead. Choose a few times that work for you."),
+      h("div", { class: "card-title" }, "Pick your next study time"),
+      h("p", { class: "muted small" }, "Groups form 48 hours ahead, so pick a few times that work for you now."),
       h("a", { class: "btn btn-primary btn-block", href: "#/exams" }, "Pick times")
     );
   }
 
   function backLink(h) {
-    return h("p", { class: "center mt" }, h("a", { class: "btn-link", href: "#/exams" }, "Back to Exams"));
+    return h("p", { class: "center mt" }, h("a", { class: "btn-link", href: "#/exams" }, "Back to Study"));
   }
 
   function renderAfter(params, mount) {

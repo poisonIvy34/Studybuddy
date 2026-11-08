@@ -1,4 +1,4 @@
-/* js/views/exams.js — the student's exam view (#/exams) and the session screen (#/session/:id).
+/* js/views/exams.js — the Study tab (#/exams: study sessions by class, D44) and the session screen (#/session/:id).
  *
  * Every decision (what is listed, who can pick, which seat buttons show, who the tablemates are)
  * comes from SB.rules. This file only draws what rules return and calls SB.store actions.
@@ -40,7 +40,12 @@
 
   function whenText(slot) { return fmt(slot.start, "dayTime") + " – " + fmt(slot.end, "time"); }
   function vibeTag(vibe) { return h("span", { class: ["tag", "tag-" + vibe] }, vibe === "quiet" ? "Quiet" : "Chatty"); }
-  function courseLabel(course) { return course ? course.name + (course.section ? " · Sec " + course.section : "") : ""; }
+  function shortName(course) { return course ? course.name.split(":")[0] : ""; }
+  function courseTitle(course) {
+    if (!course) return "";
+    var parts = course.name.split(":");
+    return (parts[1] ? parts[1].trim() : course.name) + (course.section ? " · Sec " + course.section : "");
+  }
 
   // ---------- seat status in friendly words (the student's own seat only) ----------
   var STATUS_TAG = {
@@ -63,13 +68,13 @@
       case "placed":
         if (seat.earlyConfirm && actions.canConfirm) return "Your group is counting on you. Please tap Still coming by " +
           fmt(SB.clock.add(slot.start, { hours: -s.earlyConfirmByHoursBefore }), "dayTime") + " to keep your seat.";
-        if (actions.canConfirm && actions.canCheckIn) return "Still coming? Tell your group below, or tap I'm here at the top once you reach the spot.";
+        if (actions.canConfirm && actions.canCheckIn) return "Still coming? Let your group know, or tap I'm here once you reach the spot.";
         if (actions.canConfirm) return "Still coming? Let your group know.";
         if (n < T) return "You're in. We'll ask if you're still coming at " +
           fmt(SB.clock.add(slot.start, { minutes: -s.confirmMinutesBefore }), "dayTime") + ".";
         return "You're in.";
       case "confirmed":
-        if (actions.canCheckIn) return "Your group knows you're coming. Tap I'm here at the top when you reach the spot.";
+        if (actions.canCheckIn) return "Your group knows you're coming. Tap I'm here when you reach the spot.";
         if (n < T) return "Your group knows you're coming. I'm here opens at " +
           fmt(SB.clock.add(slot.start, { minutes: -s.checkInOpensMinutesBefore }), "time") + ".";
         if (n >= E) return "The session's over. If you were there, a tablemate can still say you studied together until " +
@@ -122,7 +127,7 @@
       })
       .map(function (n) {
         var sug = find(state.slots, n.suggestedSlotId);
-        var exam = sug && find(state.exams, sug.examId);
+        var course = sug && find(state.courses, sug.courseId);
         if (!sug) return null;
         return h("div", { class: "card v-exams-suggest" },
           h("div", { class: "section-title" }, "A slot was dropped"),
@@ -130,7 +135,7 @@
           h("div", { class: "row-between v-exams-suggest-row" },
             h("div", { class: "grow" },
               h("div", { class: "strong" }, whenText(sug)),
-              h("div", { class: "muted small" }, (exam ? exam.name + " · " : "") + sug.place)),
+              h("div", { class: "muted small" }, (course ? shortName(course) + " · " : "") + sug.place)),
             SB.ui.button("Pick this time", function () {
               act(SB.store.pick(sug.id), "Picked " + fmt(sug.start, "dayTime") + ".");
             }, { kind: "primary", class: "btn-small" })));
@@ -146,9 +151,45 @@
       h("div", { class: "row-between" },
         h("div", { class: "session-when" }, whenText(slot)),
         statusTag(seat)),
-      h("div", { class: "muted small" }, (item.exam ? item.exam.name : "") + (item.course ? " · " + item.course.name : "")),
+      h("div", { class: "muted small" }, item.course ? item.course.name : ""),
       h("div", { class: "session-spot" }, slot.place + " · " + item.session.spot),
       post ? h("div", { class: "v-exams-post" }, "How did it go? Tap to answer.") : null);
+  }
+
+  // A session happening today: status plus the actions the rules allow right now (seatActions).
+  function todayCard(state, now, item) {
+    var seat = item.seat, slot = item.slot, session = item.session;
+    var actions = SB.rules.seatActions(state, now, seat.id);
+    var btns = [];
+    if (actions.canCheckIn) {
+      btns.push(SB.ui.button("I'm here", function () {
+        act(SB.store.checkIn(seat.id));
+      }, { kind: "primary" }));
+    }
+    if (actions.canConfirm) {
+      btns.push(SB.ui.button("Still coming", function () {
+        act(SB.store.confirm(seat.id), "Great, your group knows you're coming. See you there!");
+      }, { kind: actions.canCheckIn ? "secondary" : "primary" }));
+    }
+    if (actions.canCantMakeIt || actions.canCancel) {
+      btns.push(SB.ui.button("Can't make it", function () {
+        act(actions.canCantMakeIt ? SB.store.cantMakeIt(seat.id) : SB.store.cancel(seat.id),
+          "No problem, we'll let your group know. Thanks for the heads-up!");
+      }, { kind: "secondary" }));
+    }
+    var mates = SB.rules.tablemates(state, now, seat.id).map(function (m) { return m.firstName; }).filter(Boolean);
+    return h("div", { class: ["card", "session-card", "v-exams-today", "v-exams-st-" + seat.status] },
+      h("div", { class: "row-between" },
+        h("span", { class: "tag v-exams-today-tag" }, "Today"),
+        statusTag(seat)),
+      h("div", { class: "session-when" }, whenText(slot)),
+      h("div", { class: "muted small" }, item.course ? item.course.name : ""),
+      h("div", { class: "session-spot" }, slot.place + " · " + session.spot),
+      mates.length ? h("div", { class: "small v-exams-today-mates" }, "With " + mates.join(", ")) : null,
+      h("p", { class: "status-line" }, statusText(state, now, seat, slot, actions)),
+      checkinNotice(state, seat),
+      btns.length ? h("div", { class: "btn-group v-exams-today-actions" }, btns) : null,
+      h("a", { class: "btn-link small v-exams-today-link", href: "#/session/" + session.id }, "Session details ›"));
   }
 
   function slotRow(item) {
@@ -194,19 +235,30 @@
 
   function renderExams(params, mount) {
     var state = SB.store.get(), now = SB.clock.now(), me = state.demo.currentUserId;
-    var data = SB.rules.examsFor(state, now, me);
+    var data = SB.rules.studyFor(state, now, me);
     var root = h("div", { class: "v-exams" });
 
-    root.appendChild(h("h1", null, "Your exams"));
+    root.appendChild(h("h1", null, "Study sessions"));
     var f = takeFlash(); if (f) root.appendChild(f);
 
     suggestionCards(state, now, me).forEach(function (c) { root.appendChild(c); });
 
     var upcoming = data.sessions.filter(function (s) { return s.upcoming; });
     var past = data.sessions.filter(function (s) { return !s.upcoming; }).reverse();
-    if (upcoming.length) {
-      root.appendChild(h("div", { class: "section-title" }, "Your sessions"));
-      root.appendChild(h("div", { class: "v-exams-sessions" }, upcoming.map(function (s) { return sessionCard(state, now, s); })));
+    // Today: sessions on the same MT day that haven't ended, with their buttons right on the card.
+    // The list redraws on every clock change, so buttons appear and disappear on their own.
+    var todayKey = fmt(now, "day");
+    var today = upcoming.filter(function (s) {
+      return fmt(s.slot.start, "day") === todayKey && (s.seat.status === "placed" || s.seat.status === "confirmed" || s.seat.status === "attended");
+    });
+    var later = upcoming.filter(function (s) { return today.indexOf(s) < 0; });
+    if (today.length) {
+      root.appendChild(h("div", { class: "section-title" }, "Today"));
+      root.appendChild(h("div", { class: "v-exams-sessions" }, today.map(function (s) { return todayCard(state, now, s); })));
+    }
+    if (later.length) {
+      root.appendChild(h("div", { class: "section-title" }, today.length ? "Coming up" : "Your sessions"));
+      root.appendChild(h("div", { class: "v-exams-sessions" }, later.map(function (s) { return sessionCard(state, now, s); })));
     }
     if (past.length) {
       var open = past.some(function (s) { return SB.rules.postOpen(state, now, s.seat.id); });
@@ -218,26 +270,24 @@
     var addLink = h("a", { class: "btn btn-primary btn-block", href: "#/classes" }, "+ Add a class");
     if (data.noCourses) {
       root.appendChild(h("div", { class: "empty v-exams-noclass" },
-        h("p", null, "Add your classes to see their exams and study times."), addLink));
-    } else if (!data.exams.length) {
-      root.appendChild(SB.ui.empty("No upcoming exams in your classes right now."));
-      root.appendChild(h("a", { class: "btn btn-secondary btn-block", href: "#/classes" }, "+ Add a class"));
+        h("p", null, "Add your classes to see their study times."), addLink));
     } else {
       root.appendChild(h("div", { class: "row-between v-exams-pickhead" },
         h("div", { class: "section-title" }, "Pick study times"),
         h("a", { class: "btn-link small", href: "#/classes" }, "+ Add a class")));
       root.appendChild(h("p", { class: "muted small" },
-        "Pick as many times as you like. A time becomes a session 48 hours before it starts if 3 or more people picked it."));
-      data.exams.forEach(function (e) {
+        "Pick as many times as you like. If 3 or more people pick the same time, it becomes your study group 48 hours before it starts."));
+      // D44: grouped by class; the next exam is shown only as context.
+      data.classes.forEach(function (e) {
         root.appendChild(h("section", { class: "exam" },
           h("div", { class: "exam-head" },
             h("div", null,
-              h("div", { class: "exam-name" }, e.exam.name),
-              h("div", { class: "muted small" }, courseLabel(e.course))),
-            h("div", { class: "exam-date" }, fmt(e.exam.at, "day"))),
+              h("div", { class: "exam-name" }, shortName(e.course)),
+              h("div", { class: "muted small" }, courseTitle(e.course))),
+            e.nextExam ? h("div", { class: "exam-date", title: "Next exam" }, e.nextExam.name + " · " + fmt(e.nextExam.at, "day")) : null),
           e.slots.length
             ? h("div", { class: "slot-list" }, e.slots.map(function (s) { return slotRow(s); }))
-            : SB.ui.empty("No open times for this exam right now.")));
+            : SB.ui.empty("No open study times for this class yet.")));
       });
     }
 
@@ -250,7 +300,7 @@
   function renderSession(params, mount) {
     var state = SB.store.get(), now = SB.clock.now(), me = state.demo.currentUserId;
     var root = h("div", { class: "v-exams" });
-    var back = h("a", { class: "btn-link v-exams-back", href: "#/exams" }, "‹ Exams");
+    var back = h("a", { class: "btn-link v-exams-back", href: "#/exams" }, "‹ Study");
     root.appendChild(back);
 
     var session = find(state.sessions, params.id);
@@ -263,8 +313,7 @@
       return;
     }
 
-    var exam = find(state.exams, slot.examId);
-    var course = exam && find(state.courses, exam.courseId);
+    var course = find(state.courses, slot.courseId);
     var actions = SB.rules.seatActions(state, now, seat.id);
 
     var f = takeFlash(); if (f) root.appendChild(f);
@@ -273,7 +322,7 @@
     var spotKnown = session.spot && session.spot !== "To be announced";
     root.appendChild(h("div", { class: "card session-card v-exams-detail" },
       h("div", { class: "row-between" },
-        h("div", { class: "muted small" }, (exam ? exam.name : "") + (course ? " · " + course.name : "")),
+        h("div", { class: "muted small" }, course ? course.name : ""),
         statusTag(seat)),
       h("div", { class: "session-when" }, whenText(slot)),
       h("div", { class: "session-spot" }, slot.place),
@@ -283,6 +332,14 @@
                   : h("span", { class: "tag tag-warn" }, "Spot: to be announced"),
         vibeTag(slot.vibe)),
       h("p", { class: "status-line" }, statusText(state, now, seat, slot, actions))));
+
+    // Survey feedback: explain what "locked" means while the group is still ahead.
+    if ((seat.status === "placed" || seat.status === "confirmed") && SB.clock.toMs(now) < SB.clock.toMs(slot.start)) {
+      root.appendChild(h("div", { class: "notice notice-info v-exams-lockinfo" },
+        h("strong", null, "This is your study group. "),
+        "Enough classmates picked this time, so we booked a table and grouped you together. " +
+        "Tap Still coming when we ask, then I'm here when you arrive."));
+    }
 
     var cn = checkinNotice(state, seat); if (cn) root.appendChild(cn);
 

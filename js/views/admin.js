@@ -1,7 +1,7 @@
 /* js/views/admin.js — all admin screens.
  *
  * Routes (registered here):
- *   #/admin/courses   courses, exams, slots (create / edit before lock), pilot end date, Admin inbox
+ *   #/admin/courses   classes, their study times (create / edit before lock) and exam dates (D44), pilot end date, Admin inbox
  *   #/admin/slot/:id  one slot: picks, lock result, tables, seats, confirmations, check-ins
  *   #/admin/review    unverified check-ins and reports, Accept / Reject
  *   #/admin/misses    misses per student (recent per class, D37), Remove
@@ -16,7 +16,7 @@
   var SB = (window.SB = window.SB || {});
 
   // Which inline form is open on #/admin/courses: "course:<id>", "course:new", "exam:<id>",
-  // "exam:new:<courseId>", "slot:<id>", "slot:new:<examId>", or null. View-only UI state.
+  // "exam:new:<courseId>", "slot:<id>", "slot:new:<courseId>", or null. View-only UI state.
   var editKey = null;
 
   // ---------- small helpers ----------
@@ -57,12 +57,11 @@
     return s.firstName || "(no name yet)";
   }
   function slotOfSession(state, ses) { return ses ? byId(state.slots, ses.slotId) : null; }
-  function examOfSlot(state, slot) { return slot ? byId(state.exams, slot.examId) : null; }
-  function courseOfExam(state, exam) { return exam ? byId(state.courses, exam.courseId) : null; }
+  function courseOfSlot(state, slot) { return slot ? byId(state.courses, slot.courseId) : null; } // D44
   function slotLabel(state, slot) {
     if (!slot) return "Unknown slot";
-    var exam = examOfSlot(state, slot), course = courseOfExam(state, exam);
-    return (course ? course.name + " · " : "") + (exam ? exam.name + " · " : "") + slotWhen(slot);
+    var course = courseOfSlot(state, slot);
+    return (course ? course.name + " · " : "") + slotWhen(slot);
   }
 
   function statusTag(status) {
@@ -216,7 +215,7 @@
         SB.ui.button("Cancel", closeForm, { kind: "secondary" })));
   }
 
-  function slotForm(state, slot, examId) {
+  function slotForm(state, slot, courseId) {
     var s = slot || { start: null, end: null, place: "", spots: [], vibe: "quiet" };
     var f = {
       start: h("input", { type: "datetime-local", value: toInput(s.start) }),
@@ -227,27 +226,15 @@
         h("option", { value: "quiet", selected: s.vibe === "quiet" }, "Quiet"),
         h("option", { value: "chatty", selected: s.vibe === "chatty" }, "Chatty"))
     };
-    var warnBox = h("div");
     var msg = msgBox();
     function draft() {
       return {
-        id: slot ? slot.id : undefined, examId: slot ? slot.examId : examId,
+        id: slot ? slot.id : undefined, courseId: slot ? slot.courseId : courseId,
         start: fromInput(f.start.value), end: fromInput(f.end.value),
         place: f.place.value, vibe: f.vibe.value,
         spots: f.spots.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean)
       };
     }
-    function refreshWarnings() {
-      warnBox.innerHTML = "";
-      var d = draft();
-      if (!d.start || !d.end) return;
-      SB.rules.slotWarnings(st(), d).forEach(function (w) {
-        warnBox.appendChild(h("div", { class: "notice notice-warn" }, w, " You can still save it (D29)."));
-      });
-    }
-    f.start.addEventListener("change", refreshWarnings);
-    f.end.addEventListener("change", refreshWarnings);
-    refreshWarnings();
     return h("div", { class: "card v-admin-form" },
       h("div", { class: "card-title" }, slot ? "Edit slot" : "New slot"),
       slot ? h("p", { class: "small muted" }, "Picks are kept when you edit a slot. Editing closes when the slot locks.") : null,
@@ -257,7 +244,7 @@
         h("label", { class: "field" }, h("span", { class: "field-label" }, "Booked spots, in order"), f.spots,
           h("span", { class: "field-hint" }, "Separate with commas. Table 1 gets the first spot, table 2 the second (D15).")),
         SB.ui.field("Type", f.vibe)),
-      warnBox, msg,
+      msg,
       h("div", { class: "btn-group" },
         SB.ui.button(slot ? "Save slot" : "Add slot", function () {
           var d = draft();
@@ -267,12 +254,11 @@
         SB.ui.button("Cancel", closeForm, { kind: "secondary" })));
   }
 
-  function slotRows(state, exam) {
-    var slots = sorted(state.slots.filter(function (s) { return s.examId === exam.id; }), function (s) { return ms(s.start); });
+  function slotRows(state, course) {
+    var slots = sorted(state.slots.filter(function (s) { return s.courseId === course.id; }), function (s) { return ms(s.start); });
     var rows = [];
     slots.forEach(function (slot) {
       var editable = slot.status === "open" && !(slot.jobs && slot.jobs.lockDone);
-      var warnings = SB.rules.slotWarnings(state, slot);
       var lockAt = SB.clock.add(slot.start, { hours: -state.settings.lockHoursBefore });
       var sessions = state.sessions.filter(function (x) { return x.slotId === slot.id; });
       var count = SB.rules.slotCount(state, slot.id);
@@ -286,7 +272,6 @@
           count + (count === 1 ? " pick" : " picks"),
           editable ? " · Locks " + SB.clock.fmt(lockAt, "dayTime") : "",
           slot.status === "locked" ? " · " + sessions.length + (sessions.length === 1 ? " table" : " tables") : ""),
-        warnings.map(function (w) { return h("div", { class: "small warning" }, w); }),
         h("div", { class: "btn-group v-admin-actions" },
           h("a", { class: "btn btn-secondary btn-small", href: "#/admin/slot/" + encodeURIComponent(slot.id) }, "View"),
           editable
@@ -297,23 +282,35 @@
     return rows;
   }
 
-  function examBlock(state, exam) {
-    var rows = slotRows(state, exam);
+  // D44: exams are only dates shown to students as context. Slots belong to the class.
+  function examsBlock(state, course) {
+    var exams = sorted(state.exams.filter(function (e) { return e.courseId === course.id; }), function (e) { return ms(e.at); });
     return h("div", { class: "v-admin-exam" },
       h("div", { class: "row-between row-wrap" },
-        h("div", null, h("span", { class: "exam-name" }, exam.name), " ",
-          h("span", { class: "exam-date" }, fmt(exam.at, "full"))),
-        h("div", { class: "btn-group" },
-          SB.ui.button("Edit exam", function () { openForm("exam:" + exam.id); }, { kind: "secondary", class: "btn-small" }),
-          SB.ui.button("Add slot", function () { openForm("slot:new:" + exam.id); }, { kind: "secondary", class: "btn-small" }))),
-      editKey === "exam:" + exam.id ? examForm(state, exam) : null,
-      editKey === "slot:new:" + exam.id ? slotForm(state, null, exam.id) : null,
+        h("h3", null, "Exam dates"),
+        SB.ui.button("Add exam date", function () { openForm("exam:new:" + course.id); }, { kind: "secondary", class: "btn-small" })),
+      editKey === "exam:new:" + course.id ? examForm(state, null, course.id) : null,
+      exams.length ? exams.map(function (e) {
+        return h("div", null,
+          h("div", { class: "row-between row-wrap v-admin-examrow" },
+            h("span", null, h("span", { class: "strong" }, e.name), " ", h("span", { class: "exam-date" }, fmt(e.at, "full"))),
+            SB.ui.button("Edit", function () { openForm("exam:" + e.id); }, { kind: "secondary", class: "btn-small" })),
+          editKey === "exam:" + e.id ? examForm(state, e) : null);
+      }) : h("p", { class: "small muted" }, "No exam dates. That's fine: study sessions don't need an exam."));
+  }
+
+  function slotsBlock(state, course) {
+    var rows = slotRows(state, course);
+    return h("div", { class: "v-admin-exam" },
+      h("div", { class: "row-between row-wrap" },
+        h("h3", null, "Study times"),
+        SB.ui.button("Add study time", function () { openForm("slot:new:" + course.id); }, { kind: "secondary", class: "btn-small" })),
+      editKey === "slot:new:" + course.id ? slotForm(state, null, course.id) : null,
       rows.length ? h("div", { class: "v-admin-slots" }, rows)
-        : SB.ui.empty("No slots yet. Add candidate slots in the 5 days before the exam."));
+        : SB.ui.empty("No study times yet."));
   }
 
   function courseBlock(state, course) {
-    var exams = sorted(state.exams.filter(function (e) { return e.courseId === course.id; }), function (e) { return ms(e.at); });
     var joined = state.students.filter(function (s) { return (s.courseIds || []).indexOf(course.id) >= 0; }).length;
     return h("div", { class: "card v-admin-course" },
       h("div", { class: "row-between row-wrap" },
@@ -323,11 +320,10 @@
             "Link code ", h("code", null, course.linkCode), " (#/join/" + course.linkCode + ") · ",
             course.enrolled + " enrolled · " + joined + " joined")),
         h("div", { class: "btn-group" },
-          SB.ui.button("Edit course", function () { openForm("course:" + course.id); }, { kind: "secondary", class: "btn-small" }),
-          SB.ui.button("Add exam", function () { openForm("exam:new:" + course.id); }, { kind: "secondary", class: "btn-small" }))),
+          SB.ui.button("Edit course", function () { openForm("course:" + course.id); }, { kind: "secondary", class: "btn-small" }))),
       editKey === "course:" + course.id ? courseForm(state, course) : null,
-      editKey === "exam:new:" + course.id ? examForm(state, null, course.id) : null,
-      exams.length ? exams.map(function (e) { return examBlock(state, e); }) : SB.ui.empty("No exams yet."));
+      slotsBlock(state, course),
+      examsBlock(state, course));
   }
 
   function renderCourses(params, mountEl) {
@@ -335,7 +331,7 @@
     var el = root(mountEl, "Courses", "Now: " + fmt(SB.clock.now(), "full"));
     el.appendChild(inboxSection(state));
     var sec = h("section", { class: "v-admin-section" },
-      h("div", { class: "row-between row-wrap" }, h("h2", null, "Courses, exams and slots"),
+      h("div", { class: "row-between row-wrap" }, h("h2", null, "Classes and study times"),
         SB.ui.button("Add course", function () { openForm("course:new"); }, { kind: "primary", class: "btn-small" })));
     if (editKey === "course:new") sec.appendChild(courseForm(state, null));
     var courses = sorted(state.courses, function (c) { return c.name + " " + c.section; });
@@ -355,9 +351,9 @@
       r.appendChild(h("a", { class: "btn btn-secondary", href: "#/admin/courses" }, "Back to courses"));
       return;
     }
-    var exam = examOfSlot(state, slot), course = courseOfExam(state, exam);
+    var course = courseOfSlot(state, slot);
     var el = root(mountEl, slotWhen(slot),
-      (course ? course.name + (course.section ? " · Section " + course.section : "") + " · " : "") + (exam ? exam.name : ""));
+      (course ? course.name + (course.section ? " · Section " + course.section : "") : ""));
     el.insertBefore(h("a", { class: "btn-link v-admin-back", href: "#/admin/courses" }, "← Courses"), el.firstChild);
 
     var count = SB.rules.slotCount(state, slot.id);
@@ -375,7 +371,6 @@
         h("div", { class: "kpi-sub" }, result)),
       h("div", { class: "kpi" }, h("div", { class: "kpi-label" }, "Place"), h("div", { class: "strong" }, slot.place),
         h("div", { class: "kpi-sub" }, (slot.spots || []).join(", ") || "No spots listed", " · ", slot.vibe))));
-    SB.rules.slotWarnings(state, slot).forEach(function (w) { el.appendChild(h("div", { class: "notice notice-warn" }, w)); });
 
     // Tables (sessions)
     if (sessions.length) {
@@ -508,7 +503,7 @@
     var s = state.settings;
     var el = root(mountEl, "Misses",
       "A miss is a seat the student said Still coming for, where nobody saw them: no check-in and no tablemate named them " +
-      "within " + s.postWindowHours + "h of the end. Misses count per class and reset when the next exam's study times open (D37). " +
+      "within " + s.postWindowHours + "h of the end. Misses count per class for " + s.missWindowDays + " days (D45). " +
       s.earlyConfirmAfterMisses + " recent misses in a class means confirming by " + s.earlyConfirmByHoursBefore +
       "h before that class's next sessions (D39). There is no pause.");
     var msg = msgBox();
@@ -543,8 +538,8 @@
         return h("tr", { class: k.removed ? "muted" : null },
           h("td", null, h("div", { class: "strong small" }, "Given " + fmt(k.at)), h("div", { class: "small" }, slotLabel(state, x.slot)), x.seat ? h("div", { class: "small muted" }, "Seat: " + x.seat.status.replace("_", "-")) : null),
           h("td", null, k.removed ? h("span", { class: "tag tag-muted" }, "removed")
-            : SB.rules.isRecentMiss(state, now, k.id) ? h("span", { class: "tag tag-warn" }, "counts this exam")
-            : h("span", { class: "tag tag-muted" }, "reset")),
+            : SB.rules.isRecentMiss(state, now, k.id) ? h("span", { class: "tag tag-warn" }, "counts until " + fmt(SB.clock.fromMs(ms(k.at) + s.missWindowDays * 86400000), "day"))
+            : h("span", { class: "tag tag-muted" }, "expired")),
           h("td", null, k.removed ? null : SB.ui.button("Remove", function () {
             act(msg, function () { return SB.store.removeMiss(k.id); });
           }, { kind: "danger", class: "btn-small" })));

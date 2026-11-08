@@ -45,14 +45,15 @@
           h("div", { class: "muted small" }, rel.shownUp === rel.promised ? "Your groups can count on you. Nice!" :
             "Life happens. Tapping Can't make it lets your group know and never counts against you."))));
     }
-    // D39: classes where this exam's sessions need an early answer
+    // D39: classes whose next sessions need an early answer (misses count 14 days, D45)
     var early = (me.courseIds || []).filter(function (cid) {
       return SB.rules.recentMisses(state, now, me.id, cid) >= state.settings.earlyConfirmAfterMisses;
     }).map(function (cid) { var c = (state.courses || []).find(function (x) { return x.id === cid; }); return c ? c.name.split(":")[0] : ""; });
     if (early.length) {
       root.appendChild(h("div", { class: "notice notice-info v-me-status", role: "status" },
-        "For " + early.join(" and ") + " this exam, please tap Still coming by " + state.settings.earlyConfirmByHoursBefore +
-        " hours before each session, so your group can count on a full table. This resets when the next exam's study times open."));
+        "For your next " + early.join(" and ") + " sessions, please tap Still coming by " + state.settings.earlyConfirmByHoursBefore +
+        " hours before each one, so your group can count on a full table. This goes away " + state.settings.missWindowDays +
+        " days after a missed session."));
     }
 
     // ---- Exit survey ----
@@ -75,15 +76,33 @@
 
     // ---- Classes ----
     root.appendChild(h("div", { class: "section-title" }, "Your classes"));
+    if (ui.classMsg) { root.appendChild(h("div", { class: "notice notice-ok", role: "status" }, ui.classMsg)); ui.classMsg = null; }
     var courses = (me.courseIds || []).map(function (id) {
       return (state.courses || []).find(function (c) { return c.id === id; });
     }).filter(Boolean);
     root.appendChild(card(
       courses.length
         ? courses.map(function (c) {
-            return h("div", { class: "card-row" },
-              h("span", { class: "strong" }, c.name),
-              h("span", { class: "muted small v-me-section" }, "Section " + c.section));
+            var row = h("div", { class: "card-row v-me-class" },
+              h("div", { class: "grow" },
+                h("div", { class: "strong" }, c.name),
+                h("div", { class: "muted small" }, "Section " + c.section)),
+              ui.confirmRemove === c.id ? null : button("Remove", function () {
+                ui.confirmRemove = c.id; ui.flash = null; redraw();
+              }, { kind: "secondary", class: "btn-small" }));
+            if (ui.confirmRemove !== c.id) return row;
+            // D43: confirm, since picked times in this class are un-picked
+            return [row, h("div", { class: "notice notice-warn v-me-remove", role: "alert" },
+              h("div", null, "Remove " + c.name.split(":")[0] + "? Times you picked that haven't become a group yet will be un-picked. " +
+                "Groups you're already in stay."),
+              h("div", { class: "btn-group mt" },
+                button("Remove class", function () {
+                  var r = SB.store.removeCourse(c.id);
+                  ui.confirmRemove = null;
+                  ui.classMsg = r.ok ? "Removed " + c.name.split(":")[0] + ". You can add it back anytime." : r.error;
+                  redraw();
+                }, { kind: "danger", class: "btn-small" }),
+                button("Keep it", function () { ui.confirmRemove = null; redraw(); }, { kind: "secondary", class: "btn-small" })))];
           })
         : h("p", { class: "muted small" }, "No classes yet."),
       h("div", { class: "card-actions" },
@@ -116,7 +135,7 @@
       h("div", { class: "card-row" }, h("span", { class: "muted" }, "Year"), h("span", { class: "strong" }, me.year || "—")),
       h("div", { class: "card-row" }, h("span", { class: "muted" }, "Study style"),
         vibe ? h("span", { class: "tag tag-" + vibe.value }, vibe.label) : h("span", null, "—")),
-      h("p", { class: "muted small v-me-note" }, "Your style sorts and labels times on the Exams tab. It never hides any."),
+      h("p", { class: "muted small v-me-note" }, "Your style sorts and labels times on the Study tab. It never hides any."),
       h("div", { class: "card-actions" },
         SB.ui.button("Edit profile", function () {
           ui.editing = true; ui.flash = null; ui.error = null;
@@ -214,7 +233,7 @@
     var root = h("div", { class: "v-me" },
       h("a", { class: "btn-link v-me-back", href: "#/me" }, "‹ Me"),
       h("h1", null, "Add a class"),
-      h("p", { class: "muted" }, "Pick your classes to see their exams and study times. You can also open a class link from your professor."),
+      h("p", { class: "muted" }, "Pick your classes to see their study times. You can also open a class link from your professor."),
       classUi.flash ? h("div", { class: "notice notice-ok", role: "status" }, classUi.flash) : null,
       classUi.error ? h("div", { class: "notice notice-error", role: "alert" }, classUi.error) : null,
       h("div", { class: "v-me-search" }, search),
@@ -229,13 +248,13 @@
                 ? h("span", { class: "tag tag-ok" }, "✓ Added")
                 : SB.ui.button("Add", function () {
                     var r = SB.store.addCourse(c.id);
-                    classUi.flash = r.ok ? "Added " + c.name + ". Its exams are on the Exams tab." : null;
+                    classUi.flash = r.ok ? "Added " + c.name + ". Its study times are on the Study tab." : null;
                     classUi.error = r.ok ? null : r.error;
                     redraw();
                   }, { kind: "primary", class: "btn-small" }));
           }))
         : SB.ui.empty("No classes match “" + classUi.query.trim() + "”."),
-      h("a", { class: "btn btn-secondary btn-block mt", href: "#/exams" }, "Go to Exams"));
+      h("a", { class: "btn btn-secondary btn-block mt", href: "#/exams" }, "Go to Study"));
 
     classUi.flash = null; classUi.error = null; // show once
     mount.appendChild(root);

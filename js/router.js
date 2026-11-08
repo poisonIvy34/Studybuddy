@@ -176,7 +176,7 @@
   }
 
   var STUDENT_TABS = [
-    { label: "Exams", path: "/exams", match: ["/exams", "/session", "/after"] },
+    { label: "Study", path: "/exams", match: ["/exams", "/session", "/after"] },
     { label: "Me", path: "/me", match: ["/me", "/classes", "/survey"] }
   ];
   var ADMIN_TABS = [

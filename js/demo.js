@@ -12,7 +12,9 @@
 (function () {
   var SB = (window.SB = window.SB || {});
 
-  var ui = { open: true, slotId: null, msg: null };
+  // Starts collapsed as a small tab at the top, so it never covers the app (tester feedback).
+  var ui = { open: false, slotId: null, msg: null };
+  function isPhone() { return window.matchMedia && window.matchMedia("(max-width: 480px)").matches; }
 
   function ms(iso) { return SB.clock.toMs(iso); }
 
@@ -29,7 +31,10 @@
       render();
       return;
     }
-    run(SB.store.advance(iso), "Now " + SB.clock.fmt(iso, "dayTime"));
+    var r = SB.store.advance(iso);
+    // On a phone, fold the panel away after a jump so the result is visible.
+    if (r && r.ok !== false && isPhone()) ui.open = false;
+    run(r, "Now " + SB.clock.fmt(iso, "dayTime"));
   }
 
   function jumpTargets(state, slot) {
@@ -54,15 +59,31 @@
     ].map(function (t) { t.iso = SB.clock.fromMs(t.at); return t; });
   }
 
-  function slotLabel(state, slot) {
-    var exam = (state.exams || []).find(function (e) { return e.id === slot.examId; });
-    var course = exam && (state.courses || []).find(function (c) { return c.id === exam.courseId; });
+  // Every Jump to target of a slot is in the past once End+24h has passed.
+  function slotOver(state, slot, nowMs) {
+    return ms(slot.end) + (state.settings.postWindowHours || 24) * 3600000 <= nowMs;
+  }
+
+  function slotLabel(state, slot, nowMs) {
+    var course = (state.courses || []).find(function (c) { return c.id === slot.courseId; });
     return [
-      course ? course.name : "?",
-      exam ? exam.name : "?",
+      course ? course.name.split(":")[0] : "?",
       SB.clock.fmt(slot.start, "dayTime"),
-      slot.status
+      slotOver(state, slot, nowMs) ? "already over" : slot.status
     ].join(" · ");
+  }
+
+  // Slots the current student has a seat or an active pick in.
+  function mySlotIds(state) {
+    var me = state.demo.currentUserId, ids = {};
+    if (!me) return ids;
+    (state.seats || []).forEach(function (x) {
+      if (x.studentId !== me) return;
+      var ses = (state.sessions || []).find(function (s) { return s.id === x.sessionId; });
+      if (ses) ids[ses.slotId] = true;
+    });
+    (state.picks || []).forEach(function (p) { if (p.studentId === me && p.status === "active") ids[p.slotId] = true; });
+    return ids;
   }
 
   function sortedSlots(state) {
@@ -74,7 +95,10 @@
   function chosenSlot(state, slots, nowMs) {
     var s = ui.slotId && slots.find(function (x) { return x.id === ui.slotId; });
     if (s) return s;
-    s = slots.find(function (x) { return ms(x.start) > nowMs; }) || slots[0] || null;
+    // Default: the current student's next session that isn't over, else the next slot of anyone.
+    var mine = mySlotIds(state);
+    s = slots.find(function (x) { return mine[x.id] && !slotOver(state, x, nowMs); }) ||
+        slots.find(function (x) { return ms(x.start) > nowMs; }) || slots[0] || null;
     ui.slotId = s ? s.id : null;
     return s;
   }
@@ -100,7 +124,7 @@
     var head = h(
       "div",
       { class: "demo-head" },
-      h("span", { class: "demo-title" }, "Demo — not part of the product"),
+      h("span", { class: "demo-title" }, ui.open ? "Demo controls (not part of the app)" : "Demo"),
       h(
         "button",
         {
@@ -109,7 +133,7 @@
           "aria-expanded": ui.open ? "true" : "false",
           onclick: function () { ui.open = !ui.open; render(); }
         },
-        ui.open ? "Hide" : "Show"
+        ui.open ? "Hide ▴" : "Open ▾"
       )
     );
 
@@ -130,18 +154,33 @@
         "aria-label": "Slot",
         onchange: function (e) { ui.slotId = e.target.value; ui.msg = null; render(); }
       },
-      slots.map(function (s) {
-        return h("option", { value: s.id, selected: slot && s.id === slot.id }, slotLabel(state, s));
-      })
+      (function () {
+        var mine = mySlotIds(state);
+        function opt(s) { return h("option", { value: s.id, selected: slot && s.id === slot.id }, slotLabel(state, s, nowMs)); }
+        var mineList = slots.filter(function (s) { return mine[s.id]; });
+        var groups = [];
+        if (mineList.length) groups.push(h("optgroup", { label: "This student's sessions and picks" }, mineList.map(opt)));
+        groups.push(h("optgroup", { label: "All study times" }, slots.map(opt)));
+        return groups;
+      })()
     );
+    var anyPast = false;
     var jumps = slot
       ? jumpTargets(state, slot).map(function (t) {
           var past = t.at <= nowMs;
+          if (past) anyPast = true;
           var b = button(t.label, function () { advanceTo(t.iso); }, { kind: "secondary", disabled: past, class: "btn-small demo-jump" });
           b.title = SB.clock.fmt(t.iso, "dayTime") + (past ? " (already past)" : "");
           return b;
         })
       : [h("span", { class: "muted small" }, "No slots.")];
+    // Explain grey buttons: the clock only moves forward.
+    if (anyPast) {
+      jumps.push(h("div", { class: "demo-hint" },
+        slot && slotOver(state, slot, nowMs)
+          ? "This session is already over, so its times are greyed out. Pick a later one above, or tap Reset to start over."
+          : "Grey times have already passed (the clock only moves forward). Tap Reset to start over."));
+    }
 
     var clock = section(
       "Clock",
@@ -196,7 +235,7 @@
         onchange: function (e) {
           var r = SB.store.switchUser(e.target.value || null);
           if (r && r.ok === false) run(r);
-          else { ui.msg = null; goHome(); }
+          else { ui.msg = null; ui.slotId = null; goHome(); }
         }
       },
       h("option", { value: "", selected: !cur }, "Signed out"),

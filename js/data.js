@@ -10,9 +10,11 @@
        slt_stat121_m2_wed   open, 49h out, 4 picks -> locks at 1:00 PM
        slt_chem105_m2_wed   open, 49.5h out, 2 picks -> drops at 1:30 PM
        slt_chem105_m2_thu   open, 8 picks -> splits into two tables of 4 on Tue 4:00 PM
-   - Tyler has 2 misses (one per class, both from cycle 1, so both have reset for cycle 2), Noah has 1.
+   - Study times belong to a class, not an exam (D44); exams are only shown as context.
+   - Tyler has 2 misses (one per class, from Nov 12), Noah has 1. Misses count for 14 days (D45).
      Ben's check-in is unverified and waiting for review.
-   - Zoe started sign-up but didn't finish. Lily only ever picked a slot that dropped. */
+   - Zoe started sign-up but didn't finish. Lily only ever picked a slot that dropped.
+   - ECON 110, PSYCH 111, MATH 112 and WRTG 150 (no exams) have open times from Nov 23 on. */
 (function () {
   "use strict";
   var SB = (window.SB = window.SB || {});
@@ -82,58 +84,58 @@
   var notifications = [
     // Nov 7: two cycle-1 slots drop
     ntf("stu_priya", "07T12:00", "slot_dropped", true, "#/exams", "slt_" + S121_M1_MON, null,
-      "Your Mon, Nov 9 · 12:00 PM slot for STAT 121 Exam 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 7:00 PM at Tanner Building atrium instead (3 going).",
+      "Your Mon, Nov 9 · 12:00 PM slot for STAT 121 Exam 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 7:00 PM at Tanner Building atrium, by the stairs instead (3 going).",
       "slt_" + S121_M1_WED),
     ntf("stu_sam", "07T12:00", "slot_dropped", true, "#/exams", "slt_" + S121_M1_MON, null,
-      "Your Mon, Nov 9 · 12:00 PM slot for STAT 121 Exam 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 7:00 PM at Tanner Building atrium instead (3 going).",
+      "Your Mon, Nov 9 · 12:00 PM slot for STAT 121 Exam 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 7:00 PM at Tanner Building atrium, by the stairs instead (3 going).",
       "slt_" + S121_M1_WED),
     ntf("stu_lily", "07T18:00", "slot_dropped", true, "#/exams", "slt_" + C105_M1_MON, null,
-      "Your Mon, Nov 9 · 6:00 PM slot for CHEM 105 Midterm 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 3:00 PM at Benson Building 2nd floor instead (7 going).",
+      "Your Mon, Nov 9 · 6:00 PM slot for CHEM 105 Midterm 2 was dropped: fewer than 3 people picked it. Try Wed, Nov 11 · 3:00 PM at Benson Building 2nd floor, east tables instead (7 going).",
       "slt_" + C105_M1_WED),
     // Nov 8 4:00 PM: STAT Tue slot locks, one table
     ntf("stu_maya", "08T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Priya, Sam, Emma, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Priya, Sam, Emma, Olivia")),
     ntf("stu_priya", "08T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Sam, Emma, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Sam, Emma, Olivia")),
     ntf("stu_sam", "08T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Priya, Emma, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Emma, Olivia")),
     ntf("stu_emma", "08T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Priya, Sam, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Sam, Olivia")),
     ntf("stu_olivia", "08T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Priya, Sam, Emma")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Sam, Emma")),
     // Nov 9 3:00 PM: CHEM Wed slot locks with 7 pickers -> tables of 4 and 3
     ntf("stu_hannah", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 4", 1, "Lucia, Ben, Grace")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 4", 1, "Lucia, Ben, Grace")),
     ntf("stu_lucia", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 4", 1, "Hannah, Ben, Grace")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 4", 1, "Hannah, Ben, Grace")),
     ntf("stu_ben", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 4", 1, "Hannah, Lucia, Grace")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 4", 1, "Hannah, Lucia, Grace")),
     ntf("stu_grace", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 4", 1, "Hannah, Lucia, Ben")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 4", 1, "Hannah, Lucia, Ben")),
     ntf("stu_kai", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 5", 2, "Ethan, Tyler")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 5", 2, "Ethan, Tyler")),
     ntf("stu_ethan", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 5", 2, "Kai, Tyler")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 5", 2, "Kai, Tyler")),
     ntf("stu_tyler", "09T15:00", "session_confirmed", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor", "table 5", 2, "Kai, Ethan")),
+      confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 5", 2, "Kai, Ethan")),
     // Nov 9 7:00 PM: STAT Wed slot locks
     ntf("stu_jake", "09T19:00", "session_confirmed", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium", "table 3", 1, "Tyler, Noah")),
+      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium, by the stairs", "table 3", 1, "Tyler, Noah")),
     ntf("stu_tyler", "09T19:00", "session_confirmed", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium", "table 3", 1, "Jake, Noah")),
+      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium, by the stairs", "table 3", 1, "Jake, Noah")),
     ntf("stu_noah", "09T19:00", "session_confirmed", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium", "table 3", 1, "Jake, Tyler")),
+      confirmedText("Wed, Nov 11 · 7:00 PM", "Tanner Building atrium, by the stairs", "table 3", 1, "Jake, Tyler")),
     // Nov 10 3:30 PM: Still coming? (STAT Tue)
     ntf("stu_maya", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, table 12."),
+      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_priya", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, table 12."),
+      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_sam", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, table 12."),
+      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_emma", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, table 12."),
+      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_olivia", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, table 12."),
+      "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     // Nov 10 5:30 PM: STAT Tue ends
     ntf("stu_maya", "10T17:30", "post_session", true, "#/after/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
       "How did it go? Tell us whether today's session left you more prepared."),
@@ -143,17 +145,17 @@
       "How did it go? Tell us whether today's session left you more prepared."),
     // Nov 11 2:30 PM: Still coming? (CHEM Wed, both tables)
     ntf("stu_hannah", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 4."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 4."),
     ntf("stu_lucia", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 4."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 4."),
     ntf("stu_ben", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 4."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 4."),
     ntf("stu_kai", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 5."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 5."),
     ntf("stu_ethan", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 5."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 5."),
     ntf("stu_tyler", "11T14:30", "still_coming", true, "#/session/ses_" + SES_C2, "slt_" + C105_M1_WED, "ses_" + SES_C2,
-      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, table 5."),
+      "Still coming? Your study session starts at 3:00 PM at Benson Building 2nd floor, east tables, table 5."),
     // Nov 11 4:30 PM: CHEM Wed ends (Tyler confirmed but never checked in: his miss comes 24h later)
     ntf("stu_hannah", "11T16:30", "post_session", true, "#/after/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
       "How did it go? Tell us whether today's session left you more prepared."),
@@ -165,11 +167,11 @@
       "How did it go? Tell us whether today's session left you more prepared."),
     // Nov 11 6:30 PM: Still coming? (STAT Wed)
     ntf("stu_jake", "11T18:30", "still_coming", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, table 3."),
+      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, by the stairs, table 3."),
     ntf("stu_tyler", "11T18:30", "still_coming", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, table 3."),
+      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, by the stairs, table 3."),
     ntf("stu_noah", "11T18:30", "still_coming", true, "#/session/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
-      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, table 3."),
+      "Still coming? Your study session starts at 7:00 PM at Tanner Building atrium, by the stairs, table 3."),
     // Nov 11 8:30 PM: STAT Wed ends
     ntf("stu_jake", "11T20:30", "post_session", true, "#/after/ses_" + SES_B, "slt_" + S121_M1_WED, "ses_" + SES_B,
       "How did it go? Tell us whether today's session left you more prepared."),
@@ -180,15 +182,15 @@
     ntf("stu_noah", "12T20:30", "miss_notice", false, "#/me", null, null, missText("STAT 121")),
     // Nov 14 4:00 PM: STAT Mon (cycle 2) locks with 3
     ntf("stu_maya", "14T16:00", "session_confirmed", false, "#/session/ses_" + SES_D, "slt_" + S121_M2_MON, "ses_" + SES_D,
-      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Priya, Olivia")),
+      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Priya, Olivia")),
     ntf("stu_priya", "14T16:00", "session_confirmed", false, "#/session/ses_" + SES_D, "slt_" + S121_M2_MON, "ses_" + SES_D,
-      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Olivia")),
+      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Olivia")),
     ntf("stu_olivia", "14T16:00", "session_confirmed", true, "#/session/ses_" + SES_D, "slt_" + S121_M2_MON, "ses_" + SES_D,
-      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor", "table 12", 1, "Maya, Priya"))
+      confirmedText("Mon, Nov 16 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya"))
   ];
 
   SB.seed = {
-    version: 3,
+    version: 4,
     seq: 100,
     jobs: { surveyOpenSent: false },
     demo: { now: t("16T12:00"), currentUserId: null, location: "in_range", pendingLinkCode: null },
@@ -197,7 +199,7 @@
       pilotEnd: t("30T12:00"), // PLACEHOLDER
       lockHoursBefore: 48, minGroup: 3, maxPerTable: 6,
       lowTurnoutHoursBefore: 3, confirmMinutesBefore: 30, checkInOpensMinutesBefore: 15,
-      checkInRadiusM: 150, postWindowHours: 24, slotWindowDays: 5,
+      checkInRadiusM: 150, postWindowHours: 24, missWindowDays: 14,
       earlyConfirmAfterMisses: 2, earlyConfirmAskHoursBefore: 24, earlyConfirmByHoursBefore: 3
     },
     admins: [
@@ -208,37 +210,60 @@
     // PLACEHOLDER courses, exams, slots and spots
     courses: [
       { id: "crs_stat121", name: "STAT 121: Principles of Statistics", section: "003", linkCode: "stat121-003", enrolled: 180 },
-      { id: "crs_chem105", name: "CHEM 105: General College Chemistry", section: "002", linkCode: "chem105-002", enrolled: 150 }
+      { id: "crs_chem105", name: "CHEM 105: General College Chemistry", section: "002", linkCode: "chem105-002", enrolled: 150 },
+      { id: "crs_econ110", name: "ECON 110: Economic Principles and Problems", section: "001", linkCode: "econ110-001", enrolled: 400 },
+      { id: "crs_psych111", name: "PSYCH 111: General Psychology", section: "002", linkCode: "psych111-002", enrolled: 350 },
+      { id: "crs_math112", name: "MATH 112: Calculus 1", section: "004", linkCode: "math112-004", enrolled: 200 },
+      { id: "crs_wrtg150", name: "WRTG 150: Writing and Rhetoric", section: "010", linkCode: "wrtg150-010", enrolled: 25 }
     ],
     exams: [
       { id: "exm_stat121_m1", courseId: "crs_stat121", name: "Exam 2", at: t("12T10:00") },
       { id: "exm_chem105_m1", courseId: "crs_chem105", name: "Midterm 2", at: t("13T10:00") },
       { id: "exm_stat121_m2", courseId: "crs_stat121", name: "Exam 3", at: t("20T10:00") },
-      { id: "exm_chem105_m2", courseId: "crs_chem105", name: "Midterm 3", at: t("20T14:00") }
+      { id: "exm_chem105_m2", courseId: "crs_chem105", name: "Midterm 3", at: t("20T14:00") },
+      { id: "exm_econ110_m2", courseId: "crs_econ110", name: "Midterm 2", at: t("30T10:00") },
+      { id: "exm_psych111_e3", courseId: "crs_psych111", name: "Exam 3", at: t("24T18:00") },
+      { id: "exm_math112_e4", courseId: "crs_math112", name: "Exam 4", at: t("25T09:00") }
+      // WRTG 150 has no exams: its study sessions show that sessions aren't tied to exams (D44)
     ],
     slots: [
-      { id: "slt_" + S121_M1_MON, examId: "exm_stat121_m1", start: t("09T12:00"), end: t("09T13:30"), place: "HBLL 3rd floor",
+      { id: "slt_" + S121_M1_MON, courseId: "crs_stat121", start: t("09T12:00"), end: t("09T13:30"), place: "HBLL 3rd floor, north windows",
         spots: ["table 12"], vibe: "quiet", status: "dropped", jobs: { lockDone: true } },
-      { id: "slt_" + S121_M1_TUE, examId: "exm_stat121_m1", start: t("10T16:00"), end: t("10T17:30"), place: "HBLL 3rd floor",
+      { id: "slt_" + S121_M1_TUE, courseId: "crs_stat121", start: t("10T16:00"), end: t("10T17:30"), place: "HBLL 3rd floor, north windows",
         spots: ["table 12", "table 13"], vibe: "quiet", status: "locked", jobs: { lockDone: true } },
-      { id: "slt_" + S121_M1_WED, examId: "exm_stat121_m1", start: t("11T19:00"), end: t("11T20:30"), place: "Tanner Building atrium",
+      { id: "slt_" + S121_M1_WED, courseId: "crs_stat121", start: t("11T19:00"), end: t("11T20:30"), place: "Tanner Building atrium, by the stairs",
         spots: ["table 3", "table 4"], vibe: "chatty", status: "locked", jobs: { lockDone: true } },
-      { id: "slt_" + C105_M1_MON, examId: "exm_chem105_m1", start: t("09T18:00"), end: t("09T19:30"), place: "Wilkinson Center 3rd floor",
+      { id: "slt_" + C105_M1_MON, courseId: "crs_chem105", start: t("09T18:00"), end: t("09T19:30"), place: "Wilkinson Center 3rd floor, quiet lounge",
         spots: ["table 7"], vibe: "chatty", status: "dropped", jobs: { lockDone: true } },
-      { id: "slt_" + C105_M1_WED, examId: "exm_chem105_m1", start: t("11T15:00"), end: t("11T16:30"), place: "Benson Building 2nd floor",
+      { id: "slt_" + C105_M1_WED, courseId: "crs_chem105", start: t("11T15:00"), end: t("11T16:30"), place: "Benson Building 2nd floor, east tables",
         spots: ["table 4", "table 5"], vibe: "quiet", status: "locked", jobs: { lockDone: true } },
-      { id: "slt_" + S121_M2_MON, examId: "exm_stat121_m2", start: t("16T16:00"), end: t("16T17:30"), place: "HBLL 3rd floor",
+      { id: "slt_" + S121_M2_MON, courseId: "crs_stat121", start: t("16T16:00"), end: t("16T17:30"), place: "HBLL 3rd floor, north windows",
         spots: ["table 12", "table 13"], vibe: "quiet", status: "locked", jobs: { lockDone: true } },
-      { id: "slt_" + S121_M2_WED, examId: "exm_stat121_m2", start: t("18T13:00"), end: t("18T14:30"), place: "Tanner Building atrium",
+      { id: "slt_" + S121_M2_WED, courseId: "crs_stat121", start: t("18T13:00"), end: t("18T14:30"), place: "Tanner Building atrium, by the stairs",
         spots: ["table 3", "table 4"], vibe: "chatty", status: "open", jobs: { lockDone: false } },
-      { id: "slt_" + S121_M2_THU, examId: "exm_stat121_m2", start: t("19T19:00"), end: t("19T20:30"), place: "HBLL 3rd floor",
+      { id: "slt_" + S121_M2_THU, courseId: "crs_stat121", start: t("19T19:00"), end: t("19T20:30"), place: "HBLL 3rd floor, north windows",
         spots: ["table 12", "table 13"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
-      { id: "slt_" + C105_M2_WED, examId: "exm_chem105_m2", start: t("18T13:30"), end: t("18T15:00"), place: "Benson Building 2nd floor",
+      { id: "slt_" + C105_M2_WED, courseId: "crs_chem105", start: t("18T13:30"), end: t("18T15:00"), place: "Benson Building 2nd floor, east tables",
         spots: ["table 4"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
-      { id: "slt_" + C105_M2_THU, examId: "exm_chem105_m2", start: t("19T16:00"), end: t("19T17:30"), place: "Benson Building 2nd floor",
+      { id: "slt_" + C105_M2_THU, courseId: "crs_chem105", start: t("19T16:00"), end: t("19T17:30"), place: "Benson Building 2nd floor, east tables",
         spots: ["table 4", "table 5"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
-      { id: "slt_" + C105_M2_EVE, examId: "exm_chem105_m2", start: t("19T19:30"), end: t("19T21:00"), place: "Wilkinson Center 3rd floor",
-        spots: ["table 7"], vibe: "chatty", status: "open", jobs: { lockDone: false } }
+      { id: "slt_" + C105_M2_EVE, courseId: "crs_chem105", start: t("19T19:30"), end: t("19T21:00"), place: "Wilkinson Center 3rd floor, quiet lounge",
+        spots: ["table 7"], vibe: "chatty", status: "open", jobs: { lockDone: false } },
+      // More classes (D44). All lock after Nov 21, so the earlier demo story is unchanged.
+      { id: "slt_econ110_mon", courseId: "crs_econ110", start: t("23T15:00"), end: t("23T16:30"), place: "Tanner Building atrium, by the stairs",
+        spots: ["table 6", "table 7"], vibe: "chatty", status: "open", jobs: { lockDone: false } },
+      { id: "slt_econ110_wed", courseId: "crs_econ110", start: t("25T11:00"), end: t("25T12:30"), place: "HBLL 2nd floor, group study room 2212",
+        spots: ["room 2212"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
+      { id: "slt_psych111_mon", courseId: "crs_psych111", start: t("23T19:00"), end: t("23T20:30"), place: "Joseph Smith Building, 1st floor lounge",
+        spots: ["couches by the windows"], vibe: "chatty", status: "open", jobs: { lockDone: false } },
+      { id: "slt_psych111_tue", courseId: "crs_psych111", start: t("24T12:00"), end: t("24T13:30"), place: "HBLL 3rd floor, north windows",
+        spots: ["table 14"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
+      { id: "slt_math112_mon", courseId: "crs_math112", start: t("23T10:00"), end: t("23T11:30"), place: "Talmage Building, math lab",
+        spots: ["table 2", "table 3"], vibe: "quiet", status: "open", jobs: { lockDone: false } },
+      { id: "slt_math112_tue", courseId: "crs_math112", start: t("24T18:00"), end: t("24T19:30"), place: "HBLL 3rd floor, north windows",
+        spots: ["table 15"], vibe: "chatty", status: "open", jobs: { lockDone: false } },
+      { id: "slt_wrtg150_tue", courseId: "crs_wrtg150", start: t("24T15:00"), end: t("24T16:30"), place: "JFSB 4th floor, writing center tables",
+        spots: ["table 1"], vibe: "chatty", status: "open", jobs: { lockDone: false } }
     ],
 
     conductText: // PLACEHOLDER
@@ -279,20 +304,20 @@
 
     students: [ // PLACEHOLDER people
       stu("maya", "Maya", "Sophomore", "quiet", ["crs_stat121", "crs_chem105"]),
-      stu("jake", "Jake", "Freshman", "chatty", ["crs_stat121"]),
+      stu("jake", "Jake", "Freshman", "chatty", ["crs_stat121", "crs_psych111"]),
       stu("priya", "Priya", "Junior", "quiet", ["crs_stat121"]),
       stu("tyler", "Tyler", "Sophomore", "chatty", ["crs_stat121", "crs_chem105"]),
-      stu("hannah", "Hannah", "Freshman", "quiet", ["crs_chem105"]),
-      stu("sam", "Sam", "Senior", "quiet", ["crs_stat121"]),
+      stu("hannah", "Hannah", "Freshman", "quiet", ["crs_chem105", "crs_psych111"]),
+      stu("sam", "Sam", "Senior", "quiet", ["crs_stat121", "crs_econ110"]),
       stu("lucia", "Lucia", "Sophomore", "chatty", ["crs_chem105"]),
       stu("ben", "Ben", "Junior", "quiet", ["crs_chem105"]),
       stu("emma", "Emma", "Freshman", "quiet", ["crs_stat121", "crs_chem105"]),
       stu("noah", "Noah", "Sophomore", "chatty", ["crs_stat121"]),
-      stu("grace", "Grace", "Junior", "quiet", ["crs_chem105"]),
+      stu("grace", "Grace", "Junior", "quiet", ["crs_chem105", "crs_econ110"]),
       stu("kai", "Kai", "Freshman", "chatty", ["crs_chem105"]),
       stu("olivia", "Olivia", "Senior", "quiet", ["crs_stat121"]),
       stu("ethan", "Ethan", "Sophomore", "quiet", ["crs_chem105"]),
-      stu("lily", "Lily", "Freshman", "quiet", ["crs_chem105"]),
+      stu("lily", "Lily", "Freshman", "quiet", ["crs_chem105", "crs_econ110"]),
       stu("zoe", "Zoe", "Freshman", "chatty", ["crs_stat121"],
         { profile: true, conduct: false, intake: false, permissions: false })
     ],
@@ -347,7 +372,13 @@
       pick(C105_M2_THU, "maya", "14T10:00", "active"),
       pick(C105_M2_THU, "ethan", "14T11:00", "active"),
       // cycle 2, CHEM Thu evening (open, 1 pick)
-      pick(C105_M2_EVE, "lucia", "14T12:00", "active")
+      pick(C105_M2_EVE, "lucia", "14T12:00", "active"),
+      // more classes (D44): ECON Mon has 3 picks (locks Nov 21), PSYCH Mon has 2 (drops Nov 21)
+      pick("econ110_mon", "sam", "14T13:00", "active"),
+      pick("econ110_mon", "grace", "14T14:00", "active"),
+      pick("econ110_mon", "lily", "15T09:00", "active"),
+      pick("psych111_mon", "jake", "15T10:00", "active"),
+      pick("psych111_mon", "hannah", "15T11:00", "active")
     ],
 
     sessions: [
@@ -392,11 +423,11 @@
     ],
 
     misses: [ // given when each session's 24h window closed (D36)
-      { id: "mis_tyler_chem", studentId: "stu_tyler", seatId: "set_" + SES_C2 + "_tyler", examId: "exm_chem105_m1",
+      { id: "mis_tyler_chem", studentId: "stu_tyler", seatId: "set_" + SES_C2 + "_tyler", courseId: "crs_chem105",
         at: t("12T16:30"), removed: false },
-      { id: "mis_tyler_stat", studentId: "stu_tyler", seatId: "set_" + SES_B + "_tyler", examId: "exm_stat121_m1",
+      { id: "mis_tyler_stat", studentId: "stu_tyler", seatId: "set_" + SES_B + "_tyler", courseId: "crs_stat121",
         at: t("12T20:30"), removed: false },
-      { id: "mis_noah_stat", studentId: "stu_noah", seatId: "set_" + SES_B + "_noah", examId: "exm_stat121_m1",
+      { id: "mis_noah_stat", studentId: "stu_noah", seatId: "set_" + SES_B + "_noah", courseId: "crs_stat121",
         at: t("12T20:30"), removed: false }
     ],
     reports: [],
@@ -433,9 +464,13 @@
 
   // Hand-computed from the seed above (see the comments for each count). Values are num / den; NPS is in points.
   function m(num, den, scale) { return { num: num, den: den, value: den === 0 ? null : (num / den) * (scale || 1) }; }
+  function empty(signedUp, enrolled) {
+    return { signupConversion: m(signedUp, enrolled), matchRate: m(0, 0), showUpRate: m(0, 0), repeatUse: null,
+      betterPrepared: m(0, 0), connection: m(0, 0), noShowRate: m(0, 0), nps: m(0, 0, 100) };
+  }
   SB.seedExpectedMetrics = {
     overall: {
-      signupConversion: m(18, 330),   // 8 STAT + 10 CHEM finished sign-ups (Zoe unfinished) / 180 + 150
+      signupConversion: m(23, 1305),  // 8 STAT + 10 CHEM + 3 ECON + 2 PSYCH finished (Zoe unfinished) / 180+150+400+350+200+25
       matchRate: m(14, 15),           // 15 students with a placed/not_placed pick; only Lily was never placed
       showUpRate: m(8, 11),           // confirmed at start: Tue 3, Wed 3, CHEM 5; valid check-ins: 3 + 1 + 4 (Ben's unverified counts)
       repeatUse: null,                // Still open #7
@@ -452,7 +487,12 @@
       crs_chem105: {
         signupConversion: m(10, 150), matchRate: m(7, 8), showUpRate: m(4, 5), repeatUse: null,
         betterPrepared: m(2, 4), connection: m(0, 0), noShowRate: m(1, 5), nps: m(0, 0, 100)
-      }
+      },
+      // New classes (D44): finished sign-ups only; no picks decided, no seats, no answers yet.
+      crs_econ110: empty(3, 400),   // Sam, Grace, Lily
+      crs_psych111: empty(2, 350),  // Jake, Hannah
+      crs_math112: empty(0, 200),
+      crs_wrtg150: empty(0, 25)
     }
   };
 })();

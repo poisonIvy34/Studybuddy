@@ -104,7 +104,7 @@
     // sign-up
     "saveProfile", "acceptConduct", "submitIntake", "finishPermissions",
     // student
-    "addCourse", "pick", "unpick", "confirm", "cantMakeIt", "cancel", "checkIn", "report", "answerPost", "submitExit", "deleteAccount",
+    "addCourse", "removeCourse", "pick", "unpick", "confirm", "cantMakeIt", "cancel", "checkIn", "report", "answerPost", "submitExit", "deleteAccount",
     // notifications
     "markRead",
     // admin

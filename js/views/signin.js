@@ -108,14 +108,14 @@
           h("div", { class: "card-title" }, course.name),
           h("div", { class: "card-sub" }, "Section " + course.section)
         ),
-        h("p", { class: "muted" }, "Find a study group for your next exam. Sign in with your school email to add this course.")
+        h("p", { class: "muted" }, "Find a study group for this class. Sign in with your school email to add it.")
       );
     }
     return h(
       "div",
       { class: "v-signin-intro" },
       h("h1", null, "Sign in"),
-      h("p", { class: "muted" }, "Study with classmates before your exams. Sign in with your school email.")
+      h("p", { class: "muted" }, "Study with classmates in your classes. Sign in with your school email.")
     );
   }
 
@@ -127,7 +127,15 @@
       h("div", { class: "v-signin-logo", "aria-hidden": "true" }, "P"),
       h("div", { class: "v-signin-word" }, "Prepd"),
       h("p", { class: "v-signin-tag" }, "Study together. Show up prepared."));
-    var body = ui.sentTo ? linkSent(h, redraw) : h("div", null, hero, intro(h, course), emailForm(h, mount, redraw));
+    // Survey feedback: a short "how it works" before sign-in.
+    var how = h("ol", { class: "v-signin-how", "aria-label": "How Prepd works" },
+      [["Pick times", "Choose a few study times for your class."],
+       ["Get a group", "If 3 or more classmates pick the same time, you're grouped at a table."],
+       ["Show up", "Tap Still coming, then I'm here when you arrive."]].map(function (s, i) {
+        return h("li", null, h("span", { class: "v-signin-how-num", "aria-hidden": "true" }, String(i + 1)),
+          h("div", null, h("div", { class: "strong" }, s[0]), h("div", { class: "muted small" }, s[1])));
+      }));
+    var body = ui.sentTo ? linkSent(h, redraw) : h("div", null, hero, how, intro(h, course), emailForm(h, mount, redraw));
     mount.appendChild(h("div", { class: "v-signin" }, body));
     if (!ui.sentTo) {
       var el = mount.querySelector("#signin-email");

@@ -561,3 +561,39 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--brand-soft)
   .demo { width: auto; }
   .demo.collapsed { margin-left: auto; width: max-content; }
 }
+
+/* ---------- Tester feedback, Nov 2026 ---------- */
+
+/* Buttons in rows never squeeze or wrap ("Add" broke onto two lines) */
+.card-row .btn, .row-between .btn, .mate .btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* Clearer hierarchy: titles, cards and buttons look different from each other */
+h2, .card-title { color: var(--accent); }
+.section-title { display: flex; align-items: center; gap: 8px; }
+.section-title::before { content: ""; flex: 0 0 auto; width: 18px; height: 4px; border-radius: 2px; background: var(--grad); }
+.exam-name { font-size: 20px; color: var(--accent); }
+.slot { background: var(--surface); }
+.slot:hover { border-color: var(--brand-2); }
+.slot-time { color: var(--accent); }
+.btn-secondary { border-width: 1.5px; }
+
+/* Notifications look tappable */
+.banner { background: linear-gradient(90deg, var(--brand-soft), var(--surface) 55%); }
+.banner:hover { box-shadow: 0 10px 28px rgba(91, 42, 110, 0.22); }
+.banner-cta { margin-left: 8px; color: var(--brand); font-weight: 700; white-space: nowrap; }
+
+/* Demo panel: a small tab at the top right that opens downward, so it never covers the tabs */
+#demo { top: 10px; right: 10px; bottom: auto; left: auto; }
+.demo { max-height: calc(100vh - 20px); }
+.demo.collapsed { width: auto; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+.demo.collapsed .demo-head { padding: 5px 6px 5px 10px; gap: 6px; }
+@media (max-width: 480px) {
+  #demo { top: 8px; right: 8px; left: auto; bottom: auto; }
+  .demo { width: calc(100vw - 16px); max-height: 75vh; }
+  .demo.collapsed { width: max-content; margin-left: 0; }
+}
+/* Leave room above the banners for the collapsed Demo tab */
+body.mode-student #banners { padding-top: 48px; }
+body.mode-admin #banners { padding-top: 48px; }
+.demo-hint { flex: 1 0 100%; margin-top: 4px; color: #6b4e00; font-size: 12px; }
+.demo .btn[disabled] { text-decoration: line-through; }

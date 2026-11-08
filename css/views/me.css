@@ -15,3 +15,7 @@
   flex: 0 0 auto; min-width: 72px; padding: 10px 12px; border-radius: 14px; text-align: center;
   background: var(--brand-soft); color: var(--brand-ink); font-size: 20px; font-weight: 750; white-space: nowrap;
 }
+
+/* Remove a class (D43) */
+.v-me .v-me-class .grow { text-align: left; }
+.v-me .v-me-remove { margin: 4px 0 8px; }

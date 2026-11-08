@@ -66,3 +66,16 @@
   font-size: 14px; font-weight: 700; color: var(--brand-ink);
   background: var(--brand-soft); border: 1px dashed var(--brand-2); border-radius: var(--radius-sm); padding: 10px 12px;
 }
+
+/* What "locked" means (tester feedback) */
+.v-exams .v-exams-lockinfo { font-size: 14.5px; }
+
+/* Today's sessions, with their buttons on the card */
+.v-exams .v-exams-today { border-left-width: 6px; box-shadow: var(--shadow-lift); }
+.v-exams .v-exams-today .session-when { margin-top: 8px; font-size: 18px; }
+.v-exams .v-exams-today-tag { background: var(--grad); color: #fff; border-color: transparent; text-transform: uppercase; letter-spacing: 0.06em; }
+.v-exams .v-exams-today-mates { margin-top: 4px; color: var(--accent); font-weight: 600; }
+.v-exams .v-exams-today .notice { margin: 10px 0 0; font-size: 14px; }
+.v-exams .v-exams-today-actions { margin-top: 12px; }
+.v-exams .v-exams-today-actions .btn { flex: 1 1 120px; }
+.v-exams .v-exams-today-link { display: inline-block; margin-top: 10px; padding-left: 0; }

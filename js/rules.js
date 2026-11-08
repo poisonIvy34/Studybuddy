@@ -20,8 +20,18 @@
   }
 
   function slotOfSession(st, ses) { return ses ? find(st.slots, ses.slotId) : null; }
-  function examOfSlot(st, slot) { return slot ? find(st.exams, slot.examId) : null; }
-  function courseOfSlot(st, slot) { var e = examOfSlot(st, slot); return e ? find(st.courses, e.courseId) : null; }
+  // D44: a slot belongs to a class (course), not an exam.
+  function courseOfSlot(st, slot) { return slot ? find(st.courses, slot.courseId) : null; }
+  function shortName(c) { return c ? c.name.split(":")[0] : "class"; }
+  // The class's next exam after `now`, shown only as context (D44). null when none.
+  function nextExam(st, courseId, now) {
+    var best = null;
+    st.exams.forEach(function (e) {
+      if (e.courseId !== courseId || ms(e.at) <= ms(now)) return;
+      if (!best || ms(e.at) < ms(best.at)) best = e;
+    });
+    return best;
+  }
   function courseIdOfSlotId(st, slotId) { var c = courseOfSlot(st, find(st.slots, slotId)); return c ? c.id : null; }
   function courseIdOfSeat(st, seat) {
     var ses = seat ? find(st.sessions, seat.sessionId) : null;
@@ -46,11 +56,7 @@
   function firstNames(st, ids) {
     return ids.map(function (id) { var s = student(st, id); return s && s.firstName ? s.firstName : "someone"; });
   }
-  function examLabel(st, slot) {
-    var e = examOfSlot(st, slot), c = courseOfSlot(st, slot);
-    var short = c ? c.name.split(":")[0] : "";
-    return (short ? short + " " : "") + (e ? e.name : "exam");
-  }
+  function classLabel(st, slot) { return shortName(courseOfSlot(st, slot)); }
   function notify(st, at, f) {
     st.notifications.push({
       id: nextId(st, "ntf_"), to: f.to, at: at, read: false, route: f.route || "#/exams", kind: f.kind,
@@ -76,26 +82,15 @@
   function hasAttendance(st, seat) { return hasValidCheckin(st, seat.id) || isAcknowledged(st, seat); }
 
   // ---------- misses (D36–D39) ----------
-  // D37: a miss stops counting when the next exam in the same class opens its study window
-  // (that exam's time minus slotWindowDays).
-  function missResetMs(st, miss) {
-    var exam = find(st.exams, miss.examId); if (!exam) return -Infinity;
-    var next = Infinity;
-    st.exams.forEach(function (e) {
-      if (e.courseId !== exam.courseId || ms(e.at) <= ms(exam.at)) return;
-      next = Math.min(next, ms(e.at) - st.settings.slotWindowDays * 86400000);
-    });
-    return next;
-  }
+  // D45 (replaces D37): a miss counts for missWindowDays (14) after it's given, per class.
+  function missResetMs(st, miss) { return ms(miss.at) + st.settings.missWindowDays * 86400000; }
   function isRecentMiss(state, now, missId) {
     var k = find(state.misses, missId);
     return !!(k && !k.removed && ms(now) < missResetMs(state, k));
   }
   function recentMisses(state, now, studentId, courseId) {
     return state.misses.filter(function (k) {
-      if (k.studentId !== studentId) return false;
-      var exam = find(state.exams, k.examId);
-      return !!(exam && exam.courseId === courseId && isRecentMiss(state, now, k.id));
+      return k.studentId === studentId && k.courseId === courseId && isRecentMiss(state, now, k.id);
     }).length;
   }
   // D38: the student's own track record, counting only promises to a group (confirmed seats).
@@ -113,16 +108,16 @@
   // Mutates st (a copy). Records a miss at `at` and sends the private, gentle notice (D38).
   function giveMiss(st, seat, at) {
     var slot = slotOfSession(st, find(st.sessions, seat.sessionId));
-    var exam = examOfSlot(st, slot), course = courseOfSlot(st, slot);
-    st.misses.push({ id: nextId(st, "mis_"), studentId: seat.studentId, seatId: seat.id, examId: exam ? exam.id : null,
+    var course = courseOfSlot(st, slot);
+    st.misses.push({ id: nextId(st, "mis_"), studentId: seat.studentId, seatId: seat.id, courseId: course ? course.id : null,
       at: at, removed: false });
-    var cls = course ? course.name.split(":")[0] : "class";
+    var cls = shortName(course);
     var n = course ? recentMisses(st, at, seat.studentId, course.id) : 0;
     var text = "Looks like you missed your " + cls + " session. Life happens! Next time, tapping “Can't make it” lets your group know.";
     if (n >= st.settings.earlyConfirmAfterMisses) {
-      text = "Looks like you missed another " + cls + " session. For your next " + cls + " sessions this exam, please confirm by " +
+      text = "Looks like you missed another " + cls + " session. For your next " + cls + " sessions, please confirm by " +
         st.settings.earlyConfirmByHoursBefore + " hours before the start, so your group can count on a full table. " +
-        "This resets when your next " + cls + " exam's study times open.";
+        "Each miss stops counting " + st.settings.missWindowDays + " days after it happened.";
     }
     notify(st, at, { to: seat.studentId, kind: "miss_notice", route: "#/me", text: text });
   }
@@ -131,7 +126,7 @@
   function suggestionFor(st, slot, studentId) {
     var best = null, bestCount = -1;
     st.slots.forEach(function (s) {
-      if (s.id === slot.id || s.examId !== slot.examId || s.status !== "open") return;
+      if (s.id === slot.id || s.courseId !== slot.courseId || s.status !== "open") return;
       var picks = activePicks(st, s.id);
       if (picks.some(function (p) { return p.studentId === studentId; })) return;
       var n = picks.length;
@@ -229,7 +224,7 @@
       });
       if (missing) {
         notify(st, at, { to: "admin", kind: "out_of_spots", route: "#/admin/slot/" + slot.id, slotId: slot.id,
-          text: "Out of spots: " + examLabel(st, slot) + " slot on " + when + " at " + slot.place + " formed " + k +
+          text: "Out of spots: " + classLabel(st, slot) + " slot on " + when + " at " + slot.place + " formed " + k +
             " tables but only " + slot.spots.length + " spots are booked. " + missing +
             " table(s) show \"To be announced\"." });
       }
@@ -238,7 +233,7 @@
       picks.forEach(function (p) { p.status = "not_placed"; });
       picks.forEach(function (p) {
         var sug = suggestionFor(st, slot, p.studentId);
-        var text = "Your " + when + " slot for " + examLabel(st, slot) + " was dropped: fewer than " + s.minGroup +
+        var text = "Your " + when + " slot for " + classLabel(st, slot) + " was dropped: fewer than " + s.minGroup +
           " people picked it.";
         if (sug) {
           text += " Try " + SB.clock.fmt(sug.start, "dayTime") + " at " + sug.place + " instead (" +
@@ -279,7 +274,7 @@
         if (still.length < st.settings.minGroup) {
           notify(st, at, { to: "admin", kind: "low_turnout", route: "#/admin/slot/" + slot.id, slotId: slot.id,
             sessionId: ses.id,
-            text: "Low turnout: " + examLabel(st, slot) + " session on " + SB.clock.fmt(slot.start, "dayTime") +
+            text: "Low turnout: " + classLabel(st, slot) + " session on " + SB.clock.fmt(slot.start, "dayTime") +
               " (table " + ses.table + ") has only " + still.length + " student" + (still.length === 1 ? "" : "s") +
               " still placed." });
         }
@@ -391,37 +386,27 @@
     return !!(state.settings.pilotEnd && ms(now) >= ms(state.settings.pilotEnd));
   }
 
-  function slotWarnings(state, slot) {
-    var w = [];
-    var exam = slot && find(state.exams, slot.examId);
-    if (!exam || !validIso(slot.start) || !validIso(slot.end)) return w;
-    var days = state.settings.slotWindowDays;
-    var from = ms(SB.clock.add(exam.at, { days: -days })), examMs = ms(exam.at);
-    if (ms(slot.start) < from || ms(slot.end) > examMs) {
-      w.push("This slot isn't in the " + days + " days before the exam (" + SB.clock.fmt(exam.at, "dayTime") + ").");
-    }
-    return w;
-  }
-
-  function examsFor(state, now, studentId) {
+  // #/exams ("Study", D44): the student's own sessions, then one entry per joined class (sorted by name)
+  // with its next exam as context and its open slots.
+  function studyFor(state, now, studentId) {
     var s = student(state, studentId);
-    var out = { sessions: [], exams: [], noCourses: true };
+    var out = { sessions: [], classes: [], noCourses: true };
     if (!s) return out;
     out.noCourses = s.courseIds.length === 0;
     var n = ms(now);
     state.seats.forEach(function (seat) {
       if (seat.studentId !== studentId) return;
       var cx = seatContext(state, seat.id); if (!cx) return;
-      out.sessions.push({ seat: seat, session: cx.session, slot: cx.slot, exam: examOfSlot(state, cx.slot),
+      out.sessions.push({ seat: seat, session: cx.session, slot: cx.slot,
         course: courseOfSlot(state, cx.slot), upcoming: n < ms(cx.slot.end) });
     });
     out.sessions.sort(function (a, b) {
       return ms(a.slot.start) - ms(b.slot.start) || (a.session.id < b.session.id ? -1 : 1);
     });
-    var exams = state.exams.filter(function (e) { return s.courseIds.indexOf(e.courseId) >= 0 && n < ms(e.at); })
-      .sort(function (a, b) { return ms(a.at) - ms(b.at) || (a.id < b.id ? -1 : 1); });
-    exams.forEach(function (e) {
-      var slots = state.slots.filter(function (sl) { return sl.examId === e.id && sl.status === "open"; })
+    var courses = s.courseIds.map(function (id) { return find(state.courses, id); }).filter(Boolean)
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : (a.id < b.id ? -1 : 1); });
+    courses.forEach(function (c) {
+      var slots = state.slots.filter(function (sl) { return sl.courseId === c.id && sl.status === "open"; })
         .sort(function (a, b) {
           var pa = a.vibe === s.vibe ? 0 : 1, pb = b.vibe === s.vibe ? 0 : 1;
           return pa - pb || ms(a.start) - ms(b.start) || (a.id < b.id ? -1 : 1);
@@ -431,7 +416,7 @@
             picked: activePicks(state, sl.id).some(function (p) { return p.studentId === studentId; }),
             canPick: canPick(state, now, studentId, sl.id) };
         });
-      out.exams.push({ exam: e, course: find(state.courses, e.courseId), slots: slots });
+      out.classes.push({ course: c, nextExam: nextExam(state, c.id, now), slots: slots });
     });
     return out;
   }
@@ -601,6 +586,19 @@
     var s = student(st, userId);
     if (s.courseIds.indexOf(c.id) >= 0) return fail(st, "You already added this class.");
     addCourseToStudent(st, s, c.linkCode);
+    return ok(st);
+  }
+  // D43: removing a class un-picks the student's active picks in it. Groups already formed stay.
+  function removeCourse(state, now, userId, courseId) {
+    var st = copy(state), err = needStudent(st, userId); if (err) return fail(st, err);
+    var s = student(st, userId);
+    if (s.courseIds.indexOf(courseId) < 0) return fail(st, "That class isn't in your list.");
+    s.courseIds = s.courseIds.filter(function (id) { return id !== courseId; });
+    st.picks.forEach(function (p) {
+      if (p.studentId !== userId || p.status !== "active") return;
+      var slot = find(st.slots, p.slotId);
+      if (slot && slot.courseId === courseId) { p.status = "removed"; p.removedReason = "student"; }
+    });
     return ok(st);
   }
   function signOut(state, now, userId) {
@@ -860,8 +858,8 @@
       if (s.status !== "open" || s.jobs.lockDone) return fail(st, "This slot has locked and can't be edited."); // Still open #10
       s.start = slot.start; s.end = slot.end; s.place = place; s.spots = spots; s.vibe = slot.vibe; // picks are kept (D29)
     } else {
-      if (!find(st.exams, slot.examId)) return fail(st, "No such exam.");
-      st.slots.push({ id: nextId(st, "slt_"), examId: slot.examId, start: slot.start, end: slot.end, place: place,
+      if (!find(st.courses, slot.courseId)) return fail(st, "No such class.");
+      st.slots.push({ id: nextId(st, "slt_"), courseId: slot.courseId, start: slot.start, end: slot.end, place: place,
         spots: spots, vibe: slot.vibe, status: "open", jobs: { lockDone: false } });
     }
     return ok(st);
@@ -908,7 +906,8 @@
     tick: tick, nextId: nextId,
     // transitions
     setLocation: setLocation, switchUser: switchUser, setPendingLink: setPendingLink,
-    requestLink: requestLink, openLink: openLink, joinCourse: joinCourse, addCourse: addCourse, signOut: signOut,
+    requestLink: requestLink, openLink: openLink, joinCourse: joinCourse, addCourse: addCourse, removeCourse: removeCourse,
+    signOut: signOut,
     saveProfile: saveProfile, acceptConduct: acceptConduct, submitIntake: submitIntake, finishPermissions: finishPermissions,
     pick: pick, unpick: unpick, confirm: confirm, cantMakeIt: cantMakeIt, cancel: cancel, checkIn: checkIn,
     report: report, answerPost: answerPost, submitExit: submitExit, deleteAccount: deleteAccount,
@@ -916,14 +915,14 @@
     saveCourse: saveCourse, saveExam: saveExam, saveSlot: saveSlot, setPilotEnd: setPilotEnd,
     decideCheckin: decideCheckin, decideReport: decideReport, removeMiss: removeMiss,
     // reads
-    examsFor: function (state, now, studentId) { return examsFor(copy(state), now, studentId); },
+    studyFor: function (state, now, studentId) { return studyFor(copy(state), now, studentId); },
     slotCount: slotCount,
     canPick: canPick,
     seatActions: seatActions,
     tablemates: function (state, now, seatId) { return tablemates(copy(state), now, seatId); },
     recentMisses: recentMisses, isRecentMiss: isRecentMiss, reliability: reliability,
     postOpen: postOpen, surveyOpen: surveyOpen,
-    slotWarnings: slotWarnings,
+    nextExam: nextExam,
     metrics: metrics
   };
 })();

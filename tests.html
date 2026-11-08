@@ -70,7 +70,7 @@
   // Slot starting at `start` (90 minutes long).
   function addSlot(st, id, start, opts) {
     opts = opts || {};
-    st.slots.push({ id: id, examId: opts.examId || "exm_x", start: start, end: addM(start, 90), place: "HBLL",
+    st.slots.push({ id: id, courseId: opts.courseId || "crs_x", start: start, end: addM(start, 90), place: "HBLL",
       spots: opts.spots || ["t1", "t2", "t3"], vibe: opts.vibe || "quiet", status: "open", jobs: { lockDone: false } });
   }
   // Picks by students 1..n (or a list), one minute apart starting Nov 9 00:00.
@@ -103,12 +103,14 @@
   section("Seed shape and consistency");
   safe("seed", function () {
     var s = SB.seed;
-    check("seed has version 3 and every top-level field", s.version === 3 && ["seq", "jobs", "demo", "settings", "admins",
+    check("seed has version 4 and every top-level field", s.version === 4 && ["seq", "jobs", "demo", "settings", "admins",
       "courses", "exams", "slots", "conductText", "ads", "surveys", "students", "picks", "sessions", "seats", "checkins", "misses",
       "reports", "postAnswers", "surveyAnswers", "notifications"].every(function (k) { return k in s; }));
     eq("demo.currentUserId and pendingLinkCode are null", [s.demo.currentUserId, s.demo.pendingLinkCode], [null, null]);
-    check("2-3 courses, each with 2 exams", s.courses.length >= 2 && s.courses.length <= 3 && s.courses.every(function (c) {
-      return s.exams.filter(function (e) { return e.courseId === c.id; }).length === 2; }));
+    check("at least 2 classes with 2 exams each, plus a class with none (D44)", s.courses.filter(function (c) {
+      return s.exams.filter(function (e) { return e.courseId === c.id; }).length === 2; }).length >= 2 &&
+      s.courses.some(function (c) { return !s.exams.some(function (e) { return e.courseId === c.id; }); }));
+    check("every slot belongs to a class", s.slots.every(function (sl) { return !!byId(s.courses, sl.courseId) && !("examId" in sl); }));
     check("about 15 students (14-16)", s.students.length >= 14 && s.students.length <= 16, s.students.length);
     eq("both admins, @byu.edu", s.admins.map(function (a) { return /@byu\.edu$/.test(a.email); }), [true, true]);
 
@@ -156,7 +158,7 @@
     check("references resolve (seats, check-ins, misses, post answers)",
       s.seats.every(function (x) { return byId(s.sessions, x.sessionId) && byId(s.students, x.studentId); }) &&
       s.checkins.every(function (c) { return byId(s.seats, c.seatId); }) &&
-      s.misses.every(function (k) { return byId(s.seats, k.seatId) && byId(s.students, k.studentId) && byId(s.exams, k.examId); }) &&
+      s.misses.every(function (k) { return byId(s.seats, k.seatId) && byId(s.students, k.studentId) && byId(s.courses, k.courseId); }) &&
       s.postAnswers.every(function (a) { return byId(s.seats, a.seatId); }));
     check("one question per survey has isConnection", ["intake", "exit"].every(function (k) {
       return s.surveys[k].filter(function (q) { return q.isConnection; }).length === 1; }));
@@ -244,9 +246,9 @@
     var seedBefore = JSON.stringify(SB.seed);
     R.tick(SB.seed, T("30T23:00"));
     R.metrics(SB.seed);
-    R.examsFor(SB.seed, SB.seed.demo.now, "stu_maya");
+    R.studyFor(SB.seed, SB.seed.demo.now, "stu_maya");
     R.pick(SB.seed, SB.seed.demo.now, "stu_priya", "slt_stat121_m2_wed");
-    check("tick, metrics, examsFor and transitions never change their input", JSON.stringify(SB.seed) === seedBefore);
+    check("tick, metrics, studyFor and transitions never change their input", JSON.stringify(SB.seed) === seedBefore);
   });
 
   // ================= LOCK =================
@@ -306,8 +308,8 @@
     addSlot(st, "slt_pop", T("13T16:00"));   // 3 picks
     addSlot(st, "slt_mid", T("13T18:00"));   // 2 picks
     addSlot(st, "slt_early", T("13T12:00")); // 2 picks, earlier than slt_mid
-    addSlot(st, "slt_other", T("13T10:00"), { examId: "exm_other" });
-    st.exams.push({ id: "exm_other", courseId: "crs_x", name: "Other", at: T("20T10:00") });
+    addSlot(st, "slt_other", T("13T10:00"), { courseId: "crs_other" });
+    st.courses.push({ id: "crs_other", name: "OTHER 101", section: "001", linkCode: "other-101", enrolled: 5 });
     addPicks(st, "slt_other", [7, 8, 9, 10, 11]);
     addPicks(st, "slt_drop", [1, 2]);
     addPicks(st, "slt_pop", [2, 5, 6]);
@@ -318,7 +320,7 @@
     eq("drop with 2: picks become not_placed", st.picks.filter(function (p) { return p.slotId === "slt_drop"; }).map(function (p) { return p.status; }), ["not_placed", "not_placed"]);
     var d = notes(st, "slot_dropped");
     eq("each picker is told", d.map(function (n) { return n.to; }), ["stu_1", "stu_2"]);
-    eq("suggestion = most popular open slot for the same exam", d[0].suggestedSlotId, "slt_pop");
+    eq("suggestion = most popular open slot for the same class (D44)", d[0].suggestedSlotId, "slt_pop");
     eq("D21: student who already picked it gets the next most popular (ties: earliest start)", d[1].suggestedSlotId, "slt_early");
     check("drop message names the suggested slot", /Fri, Nov 13 · 4:00 PM/.test(d[0].text), d[0].text);
     eq("D4: the suggestion is never picked automatically", st.picks.filter(function (p) { return p.studentId === "stu_1" && p.status === "active"; }).length, 0);
@@ -418,8 +420,8 @@
     st = R.tick(st, S_FINAL);
     var x = seatOf(st, "slt_s", "stu_1");
     eq("confirmed, never seen -> no_show at End+24h", x.status, "no_show");
-    eq("...with one miss at End+24h, tied to the exam", st.misses.map(function (k) { return [k.studentId, k.seatId, k.examId, k.at]; }),
-      [["stu_1", x.id, "exm_x", S_FINAL]]);
+    eq("...with one miss at End+24h, tied to the class", st.misses.map(function (k) { return [k.studentId, k.seatId, k.courseId, k.at]; }),
+      [["stu_1", x.id, "crs_x", S_FINAL]]);
   });
   safe("D36", function () {
     var st = lockedFixture(4); st = R.tick(st, addM(S_START, -30));
@@ -602,8 +604,6 @@
   }
   safe("misses", function () {
     var st = fixture();
-    st.exams[0].at = "2026-12-20T10:00:00-07:00";
-    st.exams.push({ id: "exm_y", courseId: "crs_x", name: "Final", at: "2026-12-30T10:00:00-07:00" });
     st.courses.push({ id: "crs_z", name: "OTHER 200", section: "001", linkCode: "other-001", enrolled: 10 });
     addSlot(st, "slt_1", T("12T10:00")); addSlot(st, "slt_2", T("13T13:00")); // each after the last miss is final
     addSlot(st, "slt_3", T("17T12:00"));   // locks Nov 15 12:00, after both misses are final
@@ -624,13 +624,17 @@
     check("D38: no pause: picking still works after 2 misses", R.canPick(two, T("14T15:00"), "stu_1", "slt_late") &&
       !R.pick(two, T("14T15:00"), "stu_1", "slt_late").error);
     eq("D38: reliability counts promises kept", R.reliability(two, "stu_1"), { shownUp: 0, promised: 2 });
-    eq("D37: misses are per class", R.recentMisses(two, T("14T15:00"), "stu_1", "crs_z"), 0);
-    eq("D37: isRecentMiss matches the reset", [R.isRecentMiss(two, T("14T15:00"), two.misses[0].id),
-      R.isRecentMiss(two, "2026-12-25T10:00:00-07:00", two.misses[0].id)], [true, false]);
+    eq("misses are per class", R.recentMisses(two, T("14T15:00"), "stu_1", "crs_z"), 0);
+    var DAY = 86400000, k0 = two.misses[0], k1 = two.misses[1];
+    function at(k, plusMs) { return C.fromMs(C.toMs(k.at) + plusMs); }
+    eq("D45: a miss counts for exactly 14 days", [R.isRecentMiss(two, at(k0, 14 * DAY - 60000), k0.id),
+      R.isRecentMiss(two, at(k0, 14 * DAY), k0.id)], [true, false]);
+    eq("D45: each miss drops off on its own", [R.recentMisses(two, at(k0, 14 * DAY), "stu_1", "crs_x"),
+      R.recentMisses(two, at(k1, 14 * DAY), "stu_1", "crs_x")], [1, 0]);
     var seedMisses = SB.seed.misses.map(function (k) { return R.isRecentMiss(SB.seed, SB.seed.demo.now, k.id); });
-    eq("D37: the seed's cycle-1 misses have all reset by Nov 16", seedMisses, [false, false, false]);
-    eq("D37: they reset when the next exam's study window opens (Dec 25 10:00)",
-      [R.recentMisses(two, "2026-12-25T09:59:00-07:00", "stu_1", "crs_x"), R.recentMisses(two, "2026-12-25T10:00:00-07:00", "stu_1", "crs_x")], [2, 0]);
+    eq("D45: the seed's Nov 12 misses still count on Nov 16", seedMisses, [true, true, true]);
+    eq("D45: Tyler has 1 recent miss in each class", [R.recentMisses(SB.seed, SB.seed.demo.now, "stu_tyler", "crs_chem105"),
+      R.recentMisses(SB.seed, SB.seed.demo.now, "stu_tyler", "crs_stat121")], [1, 1]);
 
     // Lock of slt_3: stu_1 must confirm early, stu_2 doesn't
     var L = R.tick(two, T("15T12:00"));
@@ -680,7 +684,7 @@
     var stepped = SB.seed, t = SB.seed.demo.now;
     while (C.toMs(t) < C.toMs(later)) { t = C.add(t, { minutes: 15 }); stepped = R.tick(stepped, t); }
     eq("15-minute steps give the same result as one jump", stepped, once);
-    check("the seed's timeline does its work by Nov 20", once.slots.filter(function (s) { return s.status === "open"; }).length === 0 &&
+    check("the seed's timeline does its work by Nov 20 (slots that lock by then)", once.slots.filter(function (s) { return s.status === "open" && C.toMs(s.start) - 48 * 3600000 <= C.toMs(later); }).length === 0 &&
       once.sessions.every(function (s) { return s.jobs.endDone; }));
     eq("tick sets demo.now", once.demo.now, later);
     var back = R.tick(once, SB.seed.demo.now);
@@ -760,7 +764,7 @@
     var known = run(R.openLink(s, s.demo.now, null, byId(s.students, "stu_jake").email));
     eq("known student email signs that student in", known.demo.currentUserId, "stu_jake");
     var j = run(R.joinCourse(known, s.demo.now, "stu_jake", "chem105-002"));
-    eq("opening another course's link adds that course", byId(j.students, "stu_jake").courseIds, ["crs_stat121", "crs_chem105"]);
+    eq("opening another course's link adds that course", byId(j.students, "stu_jake").courseIds, ["crs_stat121", "crs_psych111", "crs_chem105"]);
     eq("signOut clears the user", run(R.signOut(j, s.demo.now, "stu_jake")).demo.currentUserId, null);
 
     var u = n.demo.currentUserId, now = s.demo.now;
@@ -781,7 +785,7 @@
     eq("finishing permissions completes sign-up", byId(st.students, u).onboarding, { profile: true, conduct: true, intake: true, permissions: true });
     check("D34: signing in with no course link is allowed", !R.openLink(s, now, null, "solo@byu.edu").error);
     var solo = run(R.openLink(s, now, null, "solo@byu.edu"));
-    eq("D34: examsFor flags noCourses", R.examsFor(solo, now, solo.demo.currentUserId).noCourses, true);
+    eq("D34: studyFor flags noCourses", R.studyFor(solo, now, solo.demo.currentUserId).noCourses, true);
     var added = run(R.addCourse(solo, now, solo.demo.currentUserId, "crs_stat121"));
     eq("D35: addCourse adds a class without its link", byId(added.students, solo.demo.currentUserId).courseIds, ["crs_stat121"]);
     check("D35: adding the same class twice is rejected", /already/.test(R.addCourse(added, now, solo.demo.currentUserId, "crs_stat121").error || ""));
@@ -826,33 +830,54 @@
       { studentId: "stu_ben", firstName: "Ben", year: "Junior" },
       { studentId: "stu_grace", firstName: "Grace", year: "Junior" }]);
     eq("tablemates never include email or misses", tm.every(function (m) { return Object.keys(m).join() === "studentId,firstName,year"; }), true);
-    var ex = R.examsFor(s, s.demo.now, "stu_maya");
-    eq("exams shown until their time, sorted", ex.exams.map(function (e) { return e.exam.id; }), ["exm_stat121_m2", "exm_chem105_m2"]);
-    var slotIds = ex.exams[0].slots.map(function (x) { return x.slot.id; });
+    var ex = R.studyFor(s, s.demo.now, "stu_maya");
+    eq("D44: one entry per joined class, sorted by name", ex.classes.map(function (e) { return e.course.id; }), ["crs_chem105", "crs_stat121"]);
+    eq("D44: each class shows its next exam as context", ex.classes.map(function (e) { return e.nextExam && e.nextExam.id; }),
+      ["exm_chem105_m2", "exm_stat121_m2"]);
+    var stat = ex.classes[1];
+    var slotIds = stat.slots.map(function (x) { return x.slot.id; });
     eq("only open slots are listed", slotIds.sort(), ["slt_stat121_m2_thu", "slt_stat121_m2_wed"]);
-    eq("D3: preferred type first (Maya is quiet), none hidden", ex.exams[0].slots.map(function (x) { return [x.slot.vibe, x.preferred]; }),
+    eq("D3: preferred type first (Maya is quiet), none hidden", stat.slots.map(function (x) { return [x.slot.vibe, x.preferred]; }),
       [["quiet", true], ["chatty", false]]);
-    eq("slot entries carry counts only (no names)", Object.keys(ex.exams[0].slots[0]).sort(), ["canPick", "count", "picked", "preferred", "slot"]);
-    eq("picked flag and counts", ex.exams[0].slots.map(function (x) { return [x.count, x.picked]; }), [[2, false], [4, true]]);
+    eq("slot entries carry counts only (no names)", Object.keys(stat.slots[0]).sort(), ["canPick", "count", "picked", "preferred", "slot"]);
+    eq("picked flag and counts", stat.slots.map(function (x) { return [x.count, x.picked]; }), [[2, false], [4, true]]);
     eq("own sessions listed (any seat status)", ex.sessions.map(function (x) { return [x.session.id, x.seat.status]; }),
       [["ses_stat121_m1_tue_1", "attended"], ["ses_stat121_m2_mon_1", "placed"]]);
-    var j = R.examsFor(s, s.demo.now, "stu_jake");
-    eq("chatty student sees chatty first", j.exams[0].slots.map(function (x) { return x.slot.vibe; }), ["chatty", "quiet"]);
+    var j = R.studyFor(s, s.demo.now, "stu_jake");
+    var jStat = j.classes.filter(function (e) { return e.course.id === "crs_stat121"; })[0];
+    eq("chatty student sees chatty first", jStat.slots.map(function (x) { return x.slot.vibe; }), ["chatty", "quiet"]);
+    var w = R.studyFor(s, s.demo.now, "stu_jake").classes.filter(function (e) { return e.course.id === "crs_psych111"; })[0];
+    eq("D44: a class's sessions show even with no exam soon", [w.slots.length > 0, w.nextExam && w.nextExam.id], [true, "exm_psych111_e3"]);
   });
-  safe("slotWarnings", function () {
+  section("Remove a class (D43)");
+  safe("removeCourse", function () {
+    var s = SB.seed, now = s.demo.now;
+    var r = run(R.removeCourse(s, now, "stu_maya", "crs_stat121"));
+    var maya = byId(r.students, "stu_maya");
+    eq("D43: the class leaves the student's list", maya.courseIds, ["crs_chem105"]);
+    eq("D43: active picks in that class are un-picked", byId(r.picks, "pck_stat121_m2_wed_maya").status, "removed");
+    eq("D43: picks in other classes stay", byId(r.picks, "pck_chem105_m2_thu_maya").status, "active");
+    eq("D43: groups already formed stay", byId(r.seats, "set_stat121_m2_mon_1_maya").status, "placed");
+    eq("D43: the class no longer shows under Study", R.studyFor(r, now, "stu_maya").classes.map(function (e) { return e.course.id; }), ["crs_chem105"]);
+    check("D43: can't remove a class you don't have", !!R.removeCourse(r, now, "stu_maya", "crs_stat121").error);
+    check("D43: admins can't remove classes from themselves", !!R.removeCourse(s, now, "adm_ella", "crs_stat121").error);
+    var back = run(R.addCourse(r, now, "stu_maya", "crs_stat121"));
+    eq("D43: adding it back works", byId(back.students, "stu_maya").courseIds.indexOf("crs_stat121") >= 0, true);
+  });
+  safe("adminSlots", function () {
     var s = SB.seed;
-    eq("D29: slot inside the 5 days: no warning", R.slotWarnings(s, byId(s.slots, "slt_stat121_m2_wed")), []);
-    var far = copy(byId(s.slots, "slt_stat121_m2_wed")); far.start = T("02T10:00"); far.end = T("02T11:30");
-    eq("D29: slot outside the 5 days: one warning", R.slotWarnings(s, far).length, 1);
-    var r = R.saveSlot(s, s.demo.now, "adm_ella", { examId: "exm_stat121_m2", start: far.start, end: far.end, place: "HBLL", spots: ["a"], vibe: "quiet" });
-    check("D29: ...but it is allowed", !r.error && r.state.slots.length === s.slots.length + 1);
+    var far = { start: T("02T10:00"), end: T("02T11:30") };
+    var r = R.saveSlot(s, s.demo.now, "adm_ella", { courseId: "crs_wrtg150", start: far.start, end: far.end, place: "HBLL", spots: ["a"], vibe: "quiet" });
+    check("D44: an admin adds a slot to a class (any date)", !r.error && r.state.slots.length === s.slots.length + 1 &&
+      r.state.slots[r.state.slots.length - 1].courseId === "crs_wrtg150");
+    check("a new slot needs a real class", !!R.saveSlot(s, s.demo.now, "adm_ella", { courseId: "crs_nope", start: far.start, end: far.end, place: "x", spots: [], vibe: "quiet" }).error);
     var e = R.saveSlot(s, s.demo.now, "adm_ella", { id: "slt_stat121_m2_wed", start: T("18T14:00"), end: T("18T15:30"), place: "JFSB", spots: ["x"], vibe: "quiet" });
     check("D29: an open slot can be edited and keeps its picks", !e.error && byId(e.state.slots, "slt_stat121_m2_wed").place === "JFSB" &&
       e.state.picks.filter(function (p) { return p.slotId === "slt_stat121_m2_wed" && p.status === "active"; }).length === 4);
     check("a locked slot can't be edited (Still open #10)", !!R.saveSlot(s, s.demo.now, "adm_ella", { id: "slt_stat121_m2_mon", start: T("16T16:00"), end: T("16T17:30"), place: "x", spots: [], vibe: "quiet" }).error);
-    check("students can't edit slots", !!R.saveSlot(s, s.demo.now, "stu_maya", { examId: "exm_stat121_m2", start: far.start, end: far.end, place: "x", spots: [], vibe: "quiet" }).error);
+    check("students can't edit slots", !!R.saveSlot(s, s.demo.now, "stu_maya", { courseId: "crs_stat121", start: far.start, end: far.end, place: "x", spots: [], vibe: "quiet" }).error);
     var c = R.saveCourse(s, s.demo.now, "adm_ash", { name: "PSYCH 111", section: "001", linkCode: "psych111-001", enrolled: 200 });
-    check("saveCourse creates a course", !c.error && c.state.courses.length === 3);
+    check("saveCourse creates a course", !c.error && c.state.courses.length === s.courses.length + 1);
     check("link codes are unique", !!R.saveCourse(s, s.demo.now, "adm_ash", { name: "X", section: "1", linkCode: "stat121-003", enrolled: 1 }).error);
   });
   safe("markRead", function () {

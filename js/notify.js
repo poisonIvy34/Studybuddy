@@ -66,7 +66,7 @@
           "div",
           { class: "banner-body" },
           h("div", { class: "banner-text" }, n.text),
-          h("div", { class: "banner-time" }, SB.clock.fmt(n.at, "dayTime"))
+          h("div", { class: "banner-time" }, SB.clock.fmt(n.at, "dayTime"), h("span", { class: "banner-cta" }, "Tap to open ›"))
         ),
         h(
           "button",
