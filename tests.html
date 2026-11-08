@@ -57,6 +57,8 @@
     st.jobs = { surveyOpenSent: false };
     st.demo = { now: T("10T09:00"), currentUserId: null, location: "in_range", pendingLinkCode: null };
     st.settings.pilotEnd = T("30T12:00");
+    // Rule tests pin their own timing (lock at T-48h, early ask at T-24h); the seed uses 24h and 6h (D48).
+    st.settings.lockHoursBefore = 48; st.settings.earlyConfirmAskHoursBefore = 24;
     st.courses = [{ id: "crs_x", name: "TEST 101: Fixture", section: "001", linkCode: "test-001", enrolled: 50 }];
     st.exams = [{ id: "exm_x", courseId: "crs_x", name: "Exam", at: T("20T10:00") }];
     st.slots = []; st.students = []; st.picks = []; st.sessions = []; st.seats = []; st.checkins = [];
@@ -171,8 +173,8 @@
     var now = C.toMs(s.demo.now), H = 3600000;
     function picksOn(id, st) { return s.picks.filter(function (p) { return p.slotId === id && p.status === (st || "active"); }).length; }
     var open49 = s.slots.filter(function (sl) { var d = (C.toMs(sl.start) - now) / H; return sl.status === "open" && d > 48 && d <= 50; });
-    check("an open slot ~49h out with 3+ picks", open49.some(function (sl) { return picksOn(sl.id) >= 3; }));
-    check("an open slot ~49h out with 2 picks", open49.some(function (sl) { return picksOn(sl.id) === 2; }));
+    check("an open slot ~49h out with 3+ picks (locks the next day, D48)", open49.some(function (sl) { return picksOn(sl.id) >= 3; }));
+    check("an open slot ~49h out with 2 picks (drops the next day)", open49.some(function (sl) { return picksOn(sl.id) === 2; }));
     check("an open slot with 7+ picks", s.slots.some(function (sl) { return sl.status === "open" && picksOn(sl.id) >= 7; }));
     var low = s.sessions.filter(function (ses) {
       var sl = byId(s.slots, ses.slotId), d = (C.toMs(sl.start) - now) / H;
@@ -684,7 +686,7 @@
     var stepped = SB.seed, t = SB.seed.demo.now;
     while (C.toMs(t) < C.toMs(later)) { t = C.add(t, { minutes: 15 }); stepped = R.tick(stepped, t); }
     eq("15-minute steps give the same result as one jump", stepped, once);
-    check("the seed's timeline does its work by Nov 20 (slots that lock by then)", once.slots.filter(function (s) { return s.status === "open" && C.toMs(s.start) - 48 * 3600000 <= C.toMs(later); }).length === 0 &&
+    check("the seed's timeline does its work by Nov 20 (slots that lock by then)", once.slots.filter(function (s) { return s.status === "open" && C.toMs(s.start) - SB.seed.settings.lockHoursBefore * 3600000 <= C.toMs(later); }).length === 0 &&
       once.sessions.every(function (s) { return s.jobs.endDone; }));
     eq("tick sets demo.now", once.demo.now, later);
     var back = R.tick(once, SB.seed.demo.now);
@@ -694,12 +696,16 @@
     var st = R.tick(SB.seed, T("16T13:00"));
     var lt = notes(st, "low_turnout");
     eq("seed: low_turnout for the Mon 4 PM session at 1:00 PM", [lt.length, lt[0] && lt[0].sessionId], [1, "ses_stat121_m2_mon_1"]);
-    eq("seed: the 4-pick Wed slot locks at 1:00 PM", byId(st.slots, "slt_stat121_m2_wed").status, "locked");
-    st = R.tick(st, T("16T13:30"));
+    eq("D48: the 4-pick Wed slot is still open the day before (locks 24h ahead)", byId(st.slots, "slt_stat121_m2_wed").status, "open");
+    eq("D48: seed settings lock 24h ahead and ask early-confirm seats 6h ahead", [SB.seed.settings.lockHoursBefore, SB.seed.settings.earlyConfirmAskHoursBefore], [24, 6]);
+    st = R.tick(st, T("17T13:00"));
+    eq("seed: the 4-pick Wed slot locks Tue 1:00 PM (T-24h)", byId(st.slots, "slt_stat121_m2_wed").status, "locked");
+    eq("D48: its session_confirmed is sent at T-24h", notes(st, "session_confirmed").filter(function (n) { return n.slotId === "slt_stat121_m2_wed"; })[0].at, T("17T13:00"));
+    st = R.tick(st, T("17T13:30"));
     var d = notes(st, "slot_dropped").filter(function (n) { return n.slotId === "slt_chem105_m2_wed"; });
     eq("seed: the 2-pick CHEM slot drops; Grace -> 8-pick slot, Ethan (already in it) -> next", d.map(function (n) { return [n.to, n.suggestedSlotId]; }),
       [["stu_grace", "slt_chem105_m2_thu"], ["stu_ethan", "slt_chem105_m2_thueve"]]);
-    st = R.tick(st, T("17T16:00"));
+    st = R.tick(st, T("18T16:00"));
     var ses = st.sessions.filter(function (s) { return s.slotId === "slt_chem105_m2_thu"; });
     eq("seed: the 8-pick slot splits into two tables of 4", ses.map(function (s) { return [s.spot, st.seats.filter(function (x) { return x.sessionId === s.id; }).length]; }),
       [["table 4", 4], ["table 5", 4]]);

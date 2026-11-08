@@ -276,7 +276,7 @@
         h("div", { class: "section-title" }, "Pick study times"),
         h("a", { class: "btn-link small", href: "#/classes" }, "+ Add a class")));
       root.appendChild(h("p", { class: "muted small" },
-        "Pick as many times as you like. If 3 or more people pick the same time, it becomes your study group 48 hours before it starts."));
+        "Pick as many times as you like. If 3 or more people pick the same time, it becomes your study group " + state.settings.lockHoursBefore + " hours before it starts."));
       // D44: grouped by class; the next exam is shown only as context.
       data.classes.forEach(function (e) {
         root.appendChild(h("section", { class: "exam" },

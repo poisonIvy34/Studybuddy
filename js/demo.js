@@ -2,7 +2,7 @@
  *
  * SB.demo.render() draws a collapsible drawer into #demo with:
  *  - Clock: fake "now" in MT; +15m / +1h / +1 day; a slot chooser with "Jump to"
- *    Lock (T−48h) / T−24h / T−3h / T−30m / T−15m / T / End / End+24h. Past targets are disabled.
+ *    Lock (T−24h) / early ask (T−6h) / T−3h / T−30m / T−15m / T / End / End+24h. Past targets are disabled.
  *    Every clock change goes through SB.store.advance(newNow).
  *  - Location: In range / Out of range / Denied → SB.store.setLocation(v).
  *  - User: signed out, any admin, any student → SB.store.switchUser(id | null).

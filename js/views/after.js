@@ -51,7 +51,7 @@
   function nextExamCard(h) {
     return h("div", { class: "card highlight v-after-next" },
       h("div", { class: "card-title" }, "Pick your next study time"),
-      h("p", { class: "muted small" }, "Groups form 48 hours ahead, so pick a few times that work for you now."),
+      h("p", { class: "muted small" }, "Groups form " + SB.store.get().settings.lockHoursBefore + " hours ahead, so pick a few times that work for you now."),
       h("a", { class: "btn btn-primary btn-block", href: "#/exams" }, "Pick times")
     );
   }

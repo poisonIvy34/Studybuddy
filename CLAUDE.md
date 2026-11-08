@@ -32,15 +32,15 @@ If the two disagree, the PRD wins. Point out the conflict instead of picking a s
 **Slots, locks and tables** (T = slot start)
 - The admin offers candidate slots for each class (D44: slots belong to a class, not an exam; the pilot still runs around an exam crunch). Each slot has a time, a place, a list of booked spots and a type (quiet or chatty).
 - A student picks any number of slots. Picking is open until lock.
-- **At T−48h the slot locks.**
+- **At T−24h the slot locks** (D48; the PRD says T−48h).
   - **3 or more pickers:** the slot becomes a session. Pickers are split into `ceil(n / 6)` tables of balanced size, with at most 6 per table. For example, 8 pickers make two tables of 4 (PRD TC5). Each placed student is told "session confirmed" with the time, table and tablemates' first names.
   - **Fewer than 3:** the slot is **dropped**. Each picker is told, and the message suggests the most popular slot for the same exam that hasn't locked yet (see D4).
 
 **Session timeline** (T = session start)
 | When | What happens |
 | --- | --- |
-| T−48h | Lock: form tables or drop the slot (above). |
-| T−24h | Students who must confirm early (D39) get "Still coming?". |
+| T−24h | Lock: form tables or drop the slot (above). D48. |
+| T−6h | Students who must confirm early (D39) get "Still coming?". D48. |
 | T−3h | Early-confirm students who haven't answered are **released** (no miss). Then, if a session has fewer than 3 students still placed (not cancelled), an alert goes to the admin. Nothing is auto-cancelled. |
 | T−30m | Push "Still coming?" with **Still coming** / **Can't make it**. |
 | T−15m → end | **I'm here** is available to placed students who haven't cancelled. |
@@ -122,7 +122,7 @@ D36–D40 were decided on 2026-11-02. They replace the PRD's strike system (stri
 | D36 | What counts as attending | A valid check-in **or** being named by a tablemate in "Who did you study with?" (asked with the post-session question; the student taps tablemates' first names). Naming a `confirmed` seat makes it `attended` and sends that student the post-session question. Misses are decided at End+24h, when that window closes. Rejecting an unverified check-in gives no miss if a tablemate named the student. Naming someone who cancelled or was released changes nothing. |
 | D37 | When misses reset | Per class. A miss counts until the next exam in the same class opens its study window (that exam's time minus `slotWindowDays`, 5 days). A miss in one class never affects another. |
 | D38 | What students see | Each miss sends one private `miss_notice`: the 1st is gentle ("Life happens!…"); one that brings the class to 2 explains confirming early. `#/me` shows "You've shown up to X of Y sessions you said you'd come to" (Y = attended + no-shows whose miss wasn't removed). Never shown to anyone else. |
-| D39 | The consequence of 2 recent misses | At lock, a seat whose student has 2+ recent misses in that class gets `earlyConfirm: true` (fixed for that seat). Still coming / Can't make it are available from lock until T−3h; "Still coming?" is sent at T−24h; no answer by T−3h releases the seat with no miss. **There is no pause.** Seats aren't changed afterwards, by later misses or by removing one. "Reliable students placed first" is not built: slots have no seat limit, so nobody is ever left out. |
+| D39 | The consequence of 2 recent misses | At lock, a seat whose student has 2+ recent misses in that class gets `earlyConfirm: true` (fixed for that seat). Still coming / Can't make it are available from lock until T−3h; "Still coming?" is sent at T−6h (D48; was T−24h); no answer by T−3h releases the seat with no miss. **There is no pause.** Seats aren't changed afterwards, by later misses or by removing one. "Reliable students placed first" is not built: slots have no seat limit, so nobody is ever left out. |
 | D40 | Backing out | One tap on **Can't make it**, no confirmation dialog, with "No problem, we'll let your group know. Thanks for the heads-up!". The others still at the table get `mate_cancelled` naming the student by first name. Never a miss. |
 | D41 | The name StudyBuddy is taken (decided 2026-11-06) | The app shows the name **Prepd** everywhere a user sees it. PRD.md and this file keep "StudyBuddy" as the project name. |
 | D42 | Sample ads (decided 2026-11-06; departs from the PRD, which keeps ads off in the pilot) | One sample ad for a made-up local business shows below the exams on `#/exams`, always on and labeled "Sample ad". It shows the PRD's "local ads" revenue backup. Ads come from `seed.ads` (PLACEHOLDER), one per MT calendar day, in order. They have no link and record nothing. |
@@ -136,6 +136,7 @@ D43–D45 were decided on 2026-11-08, after the tester survey (17 responses). Th
 | D45 | When misses reset (replaces D37) | A miss counts for `settings.missWindowDays` (14) days after its `at`, per class (`miss.courseId`). |
 | D46 | Should misses ever limit picking? (decided 2026-11-08) | **No: accountability over punishment.** Misses never block picking; 2 recent misses in a class only means confirming early (D39). If the pilot's no-show rate goes over 20%, the planned fallback is a cap (2+ recent misses → at most 1 upcoming session in that class), never a pause. The cap is not built. |
 | D47 | Same-day sessions on the Study page (decided 2026-11-08) | Sessions on today's MT date that haven't ended show first under **Today**, with Still coming / Can't make it / I'm here on the card, exactly as `seatActions` allows at that moment. Later sessions are under **Coming up**. |
+| D48 | How far ahead a slot locks (decided 2026-11-08; departs from the PRD's T−48h) | **24 hours before it starts** (`lockHoursBefore: 24`), so students who plan late in exam week can still join. Early-confirm seats (D39) are now asked at T−6h (`earlyConfirmAskHoursBefore: 6`) instead of T−24h, so the ask doesn't land at the same moment as the lock. The answer-by time stays T−3h. |
 
 How the prototype reads the PRD (interpretations, not new rules):
 - Both Ella and Ash are admins, each with their own account and the same rights.
@@ -200,7 +201,7 @@ Student bottom tabs: **Study · Me**. Notifications show as in-app banners at th
 | `#/admin/metrics` | The six pilot metrics, plus no-show rate and NPS. |
 
 **Demo panel** (always visible and **not part of the product**; it starts as a small collapsed "Demo" tab at the top right, opens downward, and folds away on phones after a clock jump, so it never covers the app's tabs)
-- **Clock:** shows the fake "now" in MT. Buttons: +15m, +1h, +1 day, and for a chosen slot "Jump to" Lock (T−48h) / T−24h / T−3h / T−30m / T−15m / T / End / End+24h. The clock only moves forward, except through Reset. A "Jump to" target that is already past is disabled.
+- **Clock:** shows the fake "now" in MT. Buttons: +15m, +1h, +1 day, and for a chosen slot "Jump to" Lock (T−24h) / T−6h / T−3h / T−30m / T−15m / T / End / End+24h. The clock only moves forward, except through Reset. A "Jump to" target that is already past is disabled.
 - **Location:** In range / Out of range / Denied. This decides the result of the next I'm here tap.
 - **User:** switch to any mock student or admin.
 - **Reset:** reloads the seed data.
@@ -234,10 +235,10 @@ SB.seed = {
 
   settings: {
     pilotEnd: ISO,                                   // PLACEHOLDER; opens exit survey + NPS
-    lockHoursBefore: 48, minGroup: 3, maxPerTable: 6,
+    lockHoursBefore: 24, minGroup: 3, maxPerTable: 6,   // D48
     lowTurnoutHoursBefore: 3, confirmMinutesBefore: 30, checkInOpensMinutesBefore: 15,
     checkInRadiusM: 150, postWindowHours: 24, missWindowDays: 14,   // D45
-    earlyConfirmAfterMisses: 2, earlyConfirmAskHoursBefore: 24, earlyConfirmByHoursBefore: 3   // D39
+    earlyConfirmAfterMisses: 2, earlyConfirmAskHoursBefore: 6, earlyConfirmByHoursBefore: 3   // D39, D48
   },
   admins: [{ id: "adm_…", name: string, email: string }],   // Ella, Ash; @byu.edu emails, so they can sign in at #/signin
 
@@ -354,7 +355,7 @@ SB.seed = {
   4. T−30m
   5. Early release (T−3h)
   6. Low turnout (T−3h)
-  7. Early ask (T−24h)
+  7. Early ask (T−6h)
   8. Lock
   9. Pilot end
 - The order makes misses settle before any slot locks, so a lock sees the final recent-miss counts (D39), and frees early-confirm seats before the low-turnout count.
@@ -362,8 +363,8 @@ SB.seed = {
 
 | Job | Time | Flag | Effect |
 | --- | --- | --- | --- |
-| Lock | slot start − 48h | `slot.jobs.lockDone` | Form tables or drop the slot. Active picks become `placed` or `not_placed`. Each seat's `earlyConfirm` is set from recent misses (D39). Send `session_confirmed`, or `slot_dropped` with its suggestion. Tables are formed by D30. If spots run out, the table still forms with spot "To be announced" and `out_of_spots` is sent (D31). |
-| Early ask | T − 24h | `session.jobs.earlyAskSent` | Send `still_coming` to every `placed` seat with `earlyConfirm`. |
+| Lock | slot start − 24h (D48) | `slot.jobs.lockDone` | Form tables or drop the slot. Active picks become `placed` or `not_placed`. Each seat's `earlyConfirm` is set from recent misses (D39). Send `session_confirmed`, or `slot_dropped` with its suggestion. Tables are formed by D30. If spots run out, the table still forms with spot "To be announced" and `out_of_spots` is sent (D31). |
+| Early ask | T − 6h (D48) | `session.jobs.earlyAskSent` | Send `still_coming` to every `placed` seat with `earlyConfirm`. |
 | Early release | T − 3h | `session.jobs.earlyReleaseDone` | `placed` seats with `earlyConfirm` → `released` (no miss). |
 | Low turnout | T − 3h | `session.jobs.lowTurnoutSent` | If fewer than 3 seats are `placed` or `confirmed`, send `low_turnout` to `"admin"`. |
 | Still coming? | T − 30m | `session.jobs.confirmSent` | Send `still_coming` to every `placed` seat. |
