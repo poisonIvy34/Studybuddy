@@ -105,15 +105,15 @@
   section("Seed shape and consistency");
   safe("seed", function () {
     var s = SB.seed;
-    check("seed has version 4 and every top-level field", s.version === 4 && ["seq", "jobs", "demo", "settings", "admins",
+    check("seed has version 5 and every top-level field", s.version === 5 && ["seq", "jobs", "demo", "settings", "admins",
       "courses", "exams", "slots", "conductText", "ads", "surveys", "students", "picks", "sessions", "seats", "checkins", "misses",
       "reports", "postAnswers", "surveyAnswers", "notifications"].every(function (k) { return k in s; }));
-    eq("demo.currentUserId and pendingLinkCode are null", [s.demo.currentUserId, s.demo.pendingLinkCode], [null, null]);
+    eq("D49: the demo opens as Emma (signed up, STAT 121, no picks); no pending link", [s.demo.currentUserId, s.demo.pendingLinkCode, byId(s.students, "stu_emma").courseIds, s.picks.filter(function (p) { return p.studentId === "stu_emma"; }).length], ["stu_emma", null, ["crs_stat121"], 0]);
     check("at least 2 classes with 2 exams each, plus a class with none (D44)", s.courses.filter(function (c) {
       return s.exams.filter(function (e) { return e.courseId === c.id; }).length === 2; }).length >= 2 &&
       s.courses.some(function (c) { return !s.exams.some(function (e) { return e.courseId === c.id; }); }));
     check("every slot belongs to a class", s.slots.every(function (sl) { return !!byId(s.courses, sl.courseId) && !("examId" in sl); }));
-    check("about 15 students (14-16)", s.students.length >= 14 && s.students.length <= 16, s.students.length);
+    check("about 15 students (14-17)", s.students.length >= 14 && s.students.length <= 17, s.students.length);
     eq("both admins, @byu.edu", s.admins.map(function (a) { return /@byu\.edu$/.test(a.email); }), [true, true]);
 
     // every time is November 2026 with -07:00

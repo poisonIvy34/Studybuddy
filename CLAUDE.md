@@ -137,6 +137,7 @@ D43–D45 were decided on 2026-11-08, after the tester survey (17 responses). Th
 | D46 | Should misses ever limit picking? (decided 2026-11-08) | **No: accountability over punishment.** Misses never block picking; 2 recent misses in a class only means confirming early (D39). If the pilot's no-show rate goes over 20%, the planned fallback is a cap (2+ recent misses → at most 1 upcoming session in that class), never a pause. The cap is not built. |
 | D47 | Same-day sessions on the Study page (decided 2026-11-08) | Sessions on today's MT date that haven't ended show first under **Today**, with Still coming / Can't make it / I'm here on the card, exactly as `seatActions` allows at that moment. Later sessions are under **Coming up**. |
 | D48 | How far ahead a slot locks (decided 2026-11-08; departs from the PRD's T−48h) | **24 hours before it starts** (`lockHoursBefore: 24`), so students who plan late in exam week can still join. Early-confirm seats (D39) are now asked at T−6h (`earlyConfirmAskHoursBefore: 6`) instead of T−24h, so the ask doesn't land at the same moment as the lock. The answer-by time stays T−3h. |
+| D49 | The class presentation demo (decided 2026-11-11) | The demo is built around one persona, **Emma**: a sophomore in STAT 121 who studies alone, gets distracted and knows no one in the class. The seed opens **signed in as Emma**, already signed up, with STAT 121 added and no picks (`demo.currentUserId: "stu_emma"`). The earlier sample student named Emma is now **Ava**. The demo panel is cut down to Emma's story: four skip-ahead buttons for her next study time (Group forms / 30 min before / 15 min before / Session ends), a user list with only Emma and Signed out, and **Start over** (Reset). There is no location switch (it stays In range) and no admin in the user list; an admin can still sign in at `#/signin`. |
 
 How the prototype reads the PRD (interpretations, not new rules):
 - Both Ella and Ash are admins, each with their own account and the same rights.
@@ -200,11 +201,11 @@ Student bottom tabs: **Study · Me**. Notifications show as in-app banners at th
 | `#/admin/misses` | Misses per student, each marked as counting this exam or reset, the student's shown-up record and recent misses per class, with Remove. |
 | `#/admin/metrics` | The six pilot metrics, plus no-show rate and NPS. |
 
-**Demo panel** (always visible and **not part of the product**; it starts as a small collapsed "Demo" tab at the top right, opens downward, and folds away on phones after a clock jump, so it never covers the app's tabs)
-- **Clock:** shows the fake "now" in MT. Buttons: +15m, +1h, +1 day, and for a chosen slot "Jump to" Lock (T−24h) / T−6h / T−3h / T−30m / T−15m / T / End / End+24h. The clock only moves forward, except through Reset. A "Jump to" target that is already past is disabled.
-- **Location:** In range / Out of range / Denied. This decides the result of the next I'm here tap.
-- **User:** switch to any mock student or admin.
-- **Reset:** reloads the seed data.
+**Demo panel** (always visible and **not part of the product**; cut down for the presentation, D49; it starts as a small collapsed "Demo" tab at the top right, opens downward, and folds away on phones after a clock jump, so it never covers the app's tabs)
+- **Clock:** shows the fake "now" in MT, and four skip-ahead buttons for the current student's next study time that hasn't ended (a seat or an active pick): **Group forms** (Lock, T−24h) / **30 min before** / **15 min before** / **Session ends**. With no pick yet, it says to pick a study time first. The clock only moves forward, except through Start over. A jump that is already past is disabled.
+- **Location:** no switch (D49). It stays In range, so I'm here always succeeds.
+- **User:** Emma or Signed out (D49).
+- **Start over:** reloads the seed data (Reset).
 
 Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` to apply every time-based transition between the old "now" and the new one. These transitions are locks, drops, alerts, confirmation pushes, releases, post-session pushes, no-shows and misses. They are applied in time order. Running `tick` twice must not repeat any effect. See [Timeline engine](#timeline-engine) for the signature, the job flags and how ties are ordered.
 
@@ -227,7 +228,7 @@ Each clock change calls `SB.store.advance(newNow)`, which runs `SB.rules.tick` t
 
 ```js
 SB.seed = {
-  version: 4,                       // bump when this shape changes; older saved states are replaced by the seed
+  version: 5,                       // bump when this shape changes; older saved states are replaced by the seed
   seq: number,                      // last number used by nextId; the seed sets it above every seeded number
   jobs: { surveyOpenSent: bool },   // global timeline job: survey_open sent at settings.pilotEnd
   demo: { now: ISO, currentUserId: "stu_…" | "adm_…" | null, location: "in_range" | "out_of_range" | "denied",
@@ -311,7 +312,7 @@ SB.seed = {
 
 **Seed requirements.**
 - Set `demo.now` partway through a midterm cycle, so some slots have locked, some sessions are in the past, and the metrics show real numbers. Put every seeded time in November 2026, so every offset is −07:00.
-- Set `demo.currentUserId` to `null` and `demo.pendingLinkCode` to `null`.
+- Set `demo.currentUserId` to `"stu_emma"` (D49) and `demo.pendingLinkCode` to `null`. Emma has finished sign-up, has STAT 121 only, and has no picks.
 - Set every `jobs` flag to match `demo.now`. A job whose time has passed is `true`, and its effects (seats, misses, notifications) are in the seed.
 - Include at least 2 courses with 2 exams each (so repeat use can be shown), more example classes (one with no exams, D44), about 15 students, and both admins (Ella and Ash).
 - Include slots in every state:

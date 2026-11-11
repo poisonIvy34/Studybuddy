@@ -94,15 +94,15 @@
       "slt_" + C105_M1_WED),
     // Nov 9 4:00 PM: STAT Tue slot locks, one table
     ntf("stu_maya", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Priya, Sam, Emma, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Priya, Sam, Ava, Olivia")),
     ntf("stu_priya", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Sam, Emma, Olivia")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Sam, Ava, Olivia")),
     ntf("stu_sam", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Emma, Olivia")),
-    ntf("stu_emma", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Ava, Olivia")),
+    ntf("stu_ava", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
       confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Sam, Olivia")),
     ntf("stu_olivia", "09T16:00", "session_confirmed", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
-      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Sam, Emma")),
+      confirmedText("Tue, Nov 10 · 4:00 PM", "HBLL 3rd floor, north windows", "table 12", 1, "Maya, Priya, Sam, Ava")),
     // Nov 10 3:00 PM: CHEM Wed slot locks with 7 pickers -> tables of 4 and 3
     ntf("stu_hannah", "10T15:00", "session_confirmed", true, "#/session/ses_" + SES_C1, "slt_" + C105_M1_WED, "ses_" + SES_C1,
       confirmedText("Wed, Nov 11 · 3:00 PM", "Benson Building 2nd floor, east tables", "table 4", 1, "Lucia, Ben, Grace")),
@@ -132,7 +132,7 @@
       "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_sam", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
       "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
-    ntf("stu_emma", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
+    ntf("stu_ava", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
       "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
     ntf("stu_olivia", "10T15:30", "still_coming", true, "#/session/ses_" + SES_A, "slt_" + S121_M1_TUE, "ses_" + SES_A,
       "Still coming? Your study session starts at 4:00 PM at HBLL 3rd floor, north windows, table 12."),
@@ -190,10 +190,11 @@
   ];
 
   SB.seed = {
-    version: 4,
+    version: 5,
     seq: 100,
     jobs: { surveyOpenSent: false },
-    demo: { now: t("16T12:00"), currentUserId: null, location: "in_range", pendingLinkCode: null },
+    demo: { now: t("16T12:00"), currentUserId: "stu_emma",   // D49: the demo opens as Emma
+             location: "in_range", pendingLinkCode: null },
 
     settings: {
       pilotEnd: t("30T12:00"), // PLACEHOLDER
@@ -311,7 +312,8 @@
       stu("sam", "Sam", "Senior", "quiet", ["crs_stat121", "crs_econ110"]),
       stu("lucia", "Lucia", "Sophomore", "chatty", ["crs_chem105"]),
       stu("ben", "Ben", "Junior", "quiet", ["crs_chem105"]),
-      stu("emma", "Emma", "Freshman", "quiet", ["crs_stat121", "crs_chem105"]),
+      stu("ava", "Ava", "Freshman", "quiet", ["crs_stat121", "crs_chem105"]),
+      stu("emma", "Emma", "Sophomore", "quiet", ["crs_stat121"]),   // D49: presentation persona, signed up, no picks yet
       stu("noah", "Noah", "Sophomore", "chatty", ["crs_stat121"]),
       stu("grace", "Grace", "Junior", "quiet", ["crs_chem105", "crs_econ110"]),
       stu("kai", "Kai", "Freshman", "chatty", ["crs_chem105"]),
@@ -330,7 +332,7 @@
       pick(S121_M1_TUE, "maya", "04T09:00", "placed"),
       pick(S121_M1_TUE, "priya", "04T09:30", "placed"),
       pick(S121_M1_TUE, "sam", "04T10:30", "placed"),
-      pick(S121_M1_TUE, "emma", "05T14:00", "placed"),
+      pick(S121_M1_TUE, "ava", "05T14:00", "placed"),
       pick(S121_M1_TUE, "olivia", "06T08:00", "placed"),
       // cycle 1, STAT Wed
       pick(S121_M1_WED, "jake", "05T12:00", "placed"),
@@ -355,10 +357,10 @@
       pick(S121_M2_WED, "noah", "13T10:00", "active"),
       pick(S121_M2_WED, "sam", "13T11:00", "active"),
       pick(S121_M2_WED, "maya", "14T09:00", "active"),
-      // cycle 2, STAT Thu (open; Emma removed hers)
+      // cycle 2, STAT Thu (open; Ava removed hers)
       pick(S121_M2_THU, "priya", "13T12:00", "active"),
       pick(S121_M2_THU, "olivia", "13T13:00", "active"),
-      pick(S121_M2_THU, "emma", "13T14:00", "removed"),
+      pick(S121_M2_THU, "ava", "13T14:00", "removed"),
       // cycle 2, CHEM Wed (open, 2 picks, drops at 1:30 PM today)
       pick(C105_M2_WED, "grace", "13T16:00", "active"),
       pick(C105_M2_WED, "ethan", "13T17:00", "active"),
@@ -368,7 +370,7 @@
       pick(C105_M2_THU, "ben", "12T10:00", "active"),
       pick(C105_M2_THU, "kai", "12T11:00", "active"),
       pick(C105_M2_THU, "tyler", "12T12:00", "active"),
-      pick(C105_M2_THU, "emma", "13T15:00", "active"),
+      pick(C105_M2_THU, "ava", "13T15:00", "active"),
       pick(C105_M2_THU, "maya", "14T10:00", "active"),
       pick(C105_M2_THU, "ethan", "14T11:00", "active"),
       // cycle 2, CHEM Thu evening (open, 1 pick)
@@ -393,7 +395,7 @@
       seat(SES_A, "maya", "attended", "10T15:35"),
       seat(SES_A, "priya", "attended", "10T15:40"),
       seat(SES_A, "sam", "released"),
-      seat(SES_A, "emma", "cancelled", null, "10T15:40", "cant_make_it"),
+      seat(SES_A, "ava", "cancelled", null, "10T15:40", "cant_make_it"),
       seat(SES_A, "olivia", "attended", "10T15:32"),
       seat(SES_C1, "hannah", "attended", "11T14:31"),
       seat(SES_C1, "lucia", "attended", "11T14:33"),
@@ -450,13 +452,14 @@
       intake("sam", "no", 2, "3–5", "02T15:00"),
       intake("lucia", "yes", 3, "6–9", "03T09:00"),
       intake("ben", "no", 5, "3–5", "03T10:00"),
-      intake("emma", "no", 4, "3–5", "03T11:00"),
+      intake("ava", "no", 4, "3–5", "03T11:00"),
       intake("noah", "no", 3, "0–2", "03T12:00"),
       intake("grace", "no", 4, "6–9", "03T13:00"),
       intake("kai", "yes", 2, "3–5", "03T14:00"),
       intake("olivia", "no", 5, "10 or more", "03T15:00"),
       intake("ethan", "no", 4, "3–5", "03T16:00"),
-      intake("lily", "no", 5, "3–5", "04T09:00")
+      intake("lily", "no", 5, "3–5", "04T09:00"),
+      intake("emma", "no", 5, "3–5", "15T20:00")   // D49: knows no one, gets distracted alone
     ],
 
     notifications: notifications
@@ -470,7 +473,7 @@
   }
   SB.seedExpectedMetrics = {
     overall: {
-      signupConversion: m(23, 1305),  // 8 STAT + 10 CHEM + 3 ECON + 2 PSYCH finished (Zoe unfinished) / 180+150+400+350+200+25
+      signupConversion: m(24, 1305),  // 9 STAT (with Emma, D49) + 10 CHEM + 3 ECON + 2 PSYCH finished (Zoe unfinished) / 180+150+400+350+200+25
       matchRate: m(14, 15),           // 15 students with a placed/not_placed pick; only Lily was never placed
       showUpRate: m(8, 11),           // confirmed at start: Tue 3, Wed 3, CHEM 5; valid check-ins: 3 + 1 + 4 (Ben's unverified counts)
       repeatUse: null,                // Still open #7
@@ -481,7 +484,7 @@
     },
     byCourse: {
       crs_stat121: {
-        signupConversion: m(8, 180), matchRate: m(8, 8), showUpRate: m(4, 6), repeatUse: null,
+        signupConversion: m(9, 180), matchRate: m(8, 8), showUpRate: m(4, 6), repeatUse: null,
         betterPrepared: m(1, 3), connection: m(0, 0), noShowRate: m(2, 6), nps: m(0, 0, 100)
       },
       crs_chem105: {
